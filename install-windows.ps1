@@ -96,9 +96,29 @@ Write-Host "Press any key to close..."
 powershell -ExecutionPolicy Bypass -File "%~dp0ClaudeGravity-Limits.ps1"
 '@ | Set-Content -Encoding ASCII (Join-Path $InstallDir "ClaudeGravity-Limits.cmd")
 
-Say "Done"
+Say "Установка успешно завершена!"
+
 Write-Host ""
-Write-Host "Next steps:"
-Write-Host "  1. Run: acc accounts add"
-Write-Host "  2. Open: $InstallDir\ClaudeGravity.cmd"
-Write-Host "  3. In Claude Desktop: Settings -> Developer -> Developer Mode, then use Code mode."
+Write-Host "--- Пошаговый запуск ---"
+$step1 = Read-Host "Шаг 1/2: Добавить Google/Antigravity аккаунт прямо сейчас? [Y/n]"
+if ($step1 -eq "" -or $step1 -match "^[Yy]") {
+    Say "Запускаю привязку аккаунта..."
+    try { acc accounts add } catch {}
+}
+
+Write-Host ""
+$step2 = Read-Host "Шаг 2/2: Запустить ClaudeGravity прямо сейчас? [Y/n]"
+if ($step2 -eq "" -or $step2 -match "^[Yy]") {
+    Write-Host ""
+    Write-Host "Напоминание для Claude Desktop:"
+    Write-Host " 1. Меню Help -> Troubleshooting -> Enable Developer Mode"
+    Write-Host " 2. Переключите режим с 'Cowork' на 'Code'"
+    Write-Host " 3. Внизу выберите модель: gemini-3.6-flash-high (Antigravity) 1M"
+    Write-Host ""
+    & (Join-Path $InstallDir "ClaudeGravity.ps1")
+} else {
+    Write-Host ""
+    Write-Host "Готово! Запустить прокси всегда можно через файл:"
+    Write-Host "  $InstallDir\ClaudeGravity.cmd"
+    Write-Host ""
+}

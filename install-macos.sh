@@ -99,8 +99,26 @@ chmod +x "${INSTALL_DIR}/ClaudeGravity.command" "${INSTALL_DIR}/ClaudeGravity-Li
 xattr -d com.apple.quarantine "${INSTALL_DIR}/ClaudeGravity.command" 2>/dev/null || true
 xattr -d com.apple.quarantine "${INSTALL_DIR}/ClaudeGravity-Limits.command" 2>/dev/null || true
 
-say "Done"
-printf "\nNext steps:\n"
-printf "  1. Run: acc accounts add\n"
-printf "  2. Open: %s/ClaudeGravity.command\n" "$INSTALL_DIR"
-printf "  3. In Claude Desktop: Settings -> Developer -> Developer Mode, then use Code mode.\n\n"
+say "Установка успешно завершена!"
+
+# Поэтапная интерактивная настройка
+printf "\n--- Пошаговый запуск ---\n"
+read -p "Шаг 1/2: Добавить Google/Antigravity аккаунт прямо сейчас? [Y/n]: " reply1
+reply1=${reply1:-Y}
+if [[ "$reply1" =~ ^[Yy]$ ]]; then
+  say "Запускаю привязку аккаунта..."
+  acc accounts add || true
+fi
+
+printf "\n"
+read -p "Шаг 2/2: Запустить ClaudeGravity прямо сейчас? [Y/n]: " reply2
+reply2=${reply2:-Y}
+if [[ "$reply2" =~ ^[Yy]$ ]]; then
+  say "Напоминание для Claude Desktop:"
+  printf " 1. Меню Help -> Troubleshooting -> Enable Developer Mode\n"
+  printf " 2. Переключите режим с 'Cowork' на 'Code'\n"
+  printf " 3. Внизу выберите модель: gemini-3.6-flash-high (Antigravity) 1M\n\n"
+  exec "${INSTALL_DIR}/ClaudeGravity.command"
+else
+  printf "\nГотово! Запустить прокси всегда можно через файл:\n  %s/ClaudeGravity.command\n\n" "$INSTALL_DIR"
+fi
