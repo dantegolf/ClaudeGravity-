@@ -5,16 +5,16 @@ $env:Path = "$NpmUserDir;$env:Path"
 $env:ANTIGRAVITY_API_KEY = "antigravity"
 
 function Ensure-RelayProvider {
-  $relayDir = Join-Path $HOME ".relay-ai"
+  $relayDir = Join-Path $env:USERPROFILE ".relay-ai"
   $providersJsonPath = Join-Path $relayDir "providers.json"
 
-  if (-not (Test-Path $relayDir)) {
+  if (-not (Test-Path -LiteralPath $relayDir)) {
     New-Item -ItemType Directory -Force -Path $relayDir | Out-Null
   }
 
   $needsConfig = $true
-  if (Test-Path $providersJsonPath) {
-    $content = Get-Content $providersJsonPath -Raw -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath $providersJsonPath) {
+    $content = Get-Content -LiteralPath $providersJsonPath -Raw -ErrorAction SilentlyContinue
     if ($content -match "env:ANTIGRAVITY_API_KEY" -and $content -match "gemini") {
       $needsConfig = $false
     }
@@ -22,7 +22,7 @@ function Ensure-RelayProvider {
 
   if ($needsConfig) {
     $jsonContent = '{"schemaVersion":1,"providers":[{"id":"custom-antigravity","templateId":"custom-anthropic","name":"Antigravity","enabled":true,"authRef":"env:ANTIGRAVITY_API_KEY","api":{"npm":"@ai-sdk/anthropic","url":"http://127.0.0.1:8080"},"modelsCache":{"fetchedAt":"2026-08-11T00:00:00.000Z","models":[{"id":"gemini-3.6-flash-high","name":"gemini-3.6-flash-high","upstreamModelId":"gemini-3.6-flash-high","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"claude-sonnet-4-6","name":"claude-sonnet-4-6","upstreamModelId":"claude-sonnet-4-6","family":"claude","brand":"Claude","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-2.5-pro","name":"gemini-2.5-pro","upstreamModelId":"gemini-2.5-pro","family":"gemini","brand":"Gemini","contextWindow":2000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"}]}}]}'
-    Set-Content -Encoding UTF8 $providersJsonPath $jsonContent
+    Set-Content -LiteralPath $providersJsonPath -Value $jsonContent -Encoding UTF8
   }
 }
 
