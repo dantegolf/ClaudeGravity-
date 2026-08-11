@@ -59,62 +59,8 @@ function Ensure-RelayProvider {
   }
 
   if ($needsConfig) {
-    @'
-{
-  "schemaVersion": 1,
-  "providers": [
-    {
-      "id": "custom-antigravity",
-      "templateId": "custom-anthropic",
-      "name": "Antigravity",
-      "enabled": true,
-      "authRef": "keyring:provider:custom-antigravity",
-      "api": {
-        "npm": "@ai-sdk/anthropic",
-        "url": "http://127.0.0.1:8080"
-      },
-      "modelsCache": {
-        "fetchedAt": "2026-08-11T00:00:00.000Z",
-        "models": [
-          {
-            "id": "gemini-3.6-flash-high",
-            "name": "gemini-3.6-flash-high",
-            "upstreamModelId": "gemini-3.6-flash-high",
-            "family": "gemini",
-            "brand": "Gemini",
-            "contextWindow": 1000000,
-            "modelFormat": "anthropic",
-            "npm": "@ai-sdk/anthropic",
-            "apiUrl": "http://127.0.0.1:8080"
-          },
-          {
-            "id": "claude-sonnet-4-6",
-            "name": "claude-sonnet-4-6",
-            "upstreamModelId": "claude-sonnet-4-6",
-            "family": "claude",
-            "brand": "Claude",
-            "contextWindow": 1000000,
-            "modelFormat": "anthropic",
-            "npm": "@ai-sdk/anthropic",
-            "apiUrl": "http://127.0.0.1:8080"
-          },
-          {
-            "id": "gemini-2.5-pro",
-            "name": "gemini-2.5-pro",
-            "upstreamModelId": "gemini-2.5-pro",
-            "family": "gemini",
-            "brand": "Gemini",
-            "contextWindow": 2000000,
-            "modelFormat": "anthropic",
-            "npm": "@ai-sdk/anthropic",
-            "apiUrl": "http://127.0.0.1:8080"
-          }
-        ]
-      }
-    }
-  ]
-}
-'@ | Set-Content -Encoding UTF8 $providersJsonPath
+    $jsonContent = '{"schemaVersion":1,"providers":[{"id":"custom-antigravity","templateId":"custom-anthropic","name":"Antigravity","enabled":true,"authRef":"keyring:provider:custom-antigravity","api":{"npm":"@ai-sdk/anthropic","url":"http://127.0.0.1:8080"},"modelsCache":{"fetchedAt":"2026-08-11T00:00:00.000Z","models":[{"id":"gemini-3.6-flash-high","name":"gemini-3.6-flash-high","upstreamModelId":"gemini-3.6-flash-high","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"claude-sonnet-4-6","name":"claude-sonnet-4-6","upstreamModelId":"claude-sonnet-4-6","family":"claude","brand":"Claude","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-2.5-pro","name":"gemini-2.5-pro","upstreamModelId":"gemini-2.5-pro","family":"gemini","brand":"Gemini","contextWindow":2000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"}]}}]}'
+    Set-Content -Encoding UTF8 $providersJsonPath $jsonContent
   }
 }
 
@@ -203,7 +149,7 @@ Write-Host "Нажмите любую клавишу для закрытия..."
 
 @'
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0scripts\Check-Limits.cmd"
+powershell -ExecutionPolicy Bypass -File "%~dp0scripts\Check-Limits.ps1"
 '@ | Set-Content -Encoding ASCII (Join-Path $InstallDir "Check-Limits.cmd")
 
 Say "Установка завершена!"
