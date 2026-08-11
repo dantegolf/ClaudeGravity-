@@ -15,7 +15,7 @@ function Ensure-RelayProvider {
   $needsConfig = $true
   if (Test-Path $providersJsonPath) {
     $content = Get-Content $providersJsonPath -Raw -ErrorAction SilentlyContinue
-    if ($content -match "custom-antigravity") {
+    if ($content -match "env:ANTIGRAVITY_API_KEY") {
       $needsConfig = $false
     }
   }
@@ -73,6 +73,11 @@ try {
   acc start
   Start-Sleep -Seconds 2
 }
+
+# 4. Обновляем динамические модели
+try {
+  cmd.exe /c "relay-ai providers refresh-models custom-antigravity" | Out-Null
+} catch {}
 
 Write-Host ""
 Write-Host "[✓] Запускаю выбор модели и Claude Desktop..."

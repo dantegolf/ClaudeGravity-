@@ -66,9 +66,9 @@ command -v relay-ai >/dev/null 2>&1 || {
   read -k 1; exit 1
 }
 
-# 1. Проверяем регистрацию Antigravity провайдера в relay-ai
+# 1. Проверяем регистрацию Antigravity провайдера в relay-ai (гарантируем env:ANTIGRAVITY_API_KEY)
 mkdir -p "$RELAY_DIR"
-if [ ! -f "$PROVIDERS_JSON" ] || ! grep -q '"custom-antigravity"' "$PROVIDERS_JSON" 2>/dev/null; then
+if [ ! -f "$PROVIDERS_JSON" ] || ! grep -q '"env:ANTIGRAVITY_API_KEY"' "$PROVIDERS_JSON" 2>/dev/null; then
   cat > "$PROVIDERS_JSON" <<'EOP'
 {
   "schemaVersion": 1,
@@ -147,6 +147,9 @@ if ! curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
   acc start || true
   sleep 2
 fi
+
+# 4. Обновляем динамический список моделей провайдера в relay-ai
+relay-ai providers refresh-models custom-antigravity >/dev/null 2>&1 || true
 
 printf "\n[✓] Запускаю выбор модели и Claude Desktop...\n\n"
 printf "Напоминание для Claude Desktop:\n"
