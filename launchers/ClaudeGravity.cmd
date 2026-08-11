@@ -1,2 +1,2 @@
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0ClaudeGravity.ps1"
+powershell -ExecutionPolicy Bypass -File "%~dp0scripts\ClaudeGravity.ps1"

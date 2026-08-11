@@ -2,165 +2,67 @@
 
 # ClaudeGravity
 
-Один быстрый setup для запуска **Claude Desktop** через **Relay AI** и **Antigravity Claude Proxy**.
+Простая и удобная запуск-сборка для работы в **Claude Desktop** через мощные нейросети **Gemini 3.6 Flash** и **Claude** от Google Antigravity.
 
-```text
-Claude Desktop -> Relay AI -> Antigravity Proxy -> Gemini / Claude models
-```
+---
 
-![macOS](https://img.shields.io/badge/macOS-supported-black)
-![Windows](https://img.shields.io/badge/Windows-supported-blue)
-![Node.js](https://img.shields.io/badge/Node.js-auto--installed-green)
+## 🚀 Как начать за 1 минуту
 
-## Использованные проекты и компоненты
+### Шаг 1. Подготовка
+1. Скачайте и установите приложение **[Claude Desktop](https://claude.ai/download)**.
+2. Включите **VPN** *(он необходим для стабильной работы Claude и связи с серверами)*.
 
-Данная сборка объединяет и автоматизирует работу следующих открытых инструментов и сервисов:
+### Шаг 2. Быстрая установка
 
-- [antigravity-claude-proxy](https://www.npmjs.com/package/antigravity-claude-proxy) — локальный обратный прокси для работы протокола Claude с аккаунтами Google Antigravity (управляется утилитой `acc`).
-- [@jacobbd/relay-ai](https://www.npmjs.com/package/@jacobbd/relay-ai) — реле-сервер, связывающий приложение Claude Desktop с пользовательскими локальными API-эндпоинтами (`relay-ai`).
-- [Claude Desktop](https://claude.ai/download) — официальное десктопное приложение Anthropic Claude для macOS и Windows.
-- **Google DeepMind Antigravity** — платформа доступа к нейросетям Gemini 3.6 Flash / Claude от Google.
+Вставьте одну команду в консоль и нажмите **Enter**:
 
-## Предварительные требования (Перед установкой)
+- **macOS** (в программе Терминал):
+  ```bash
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-macos.sh)"
+  ```
 
-1. **Установите Claude Desktop**: Загрузите и установите официальное приложение [Claude Desktop](https://claude.ai/download).
-2. **Включите надёжный VPN**: Убедитесь, что у вас включён качественный VPN. Он необходим для стабильного подключения к сервисам Anthropic и Google Antigravity, а также корректной работы прокси без гео-блокировок.
-3. После выполнения первых двух шагов можно переходить к установке скрипта ниже.
+- **Windows** (в программе PowerShell):
+  ```powershell
+  irm https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-windows.ps1 | iex
+  ```
 
-## Установка
+---
 
-### macOS
+## 📂 Что появится после установки
 
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-macos.sh)"
-```
+В вашей папке `Документы/ClaudeGravity` создадутся 2 простых файла:
 
-### Windows PowerShell
+1. **`ClaudeGravity`** — **Основной запуск**. При первом запуске поможет привязать аккаунт Google, включит прокси и сам откроет Claude Desktop.
+2. **`Check-Limits`** — Быстрый просмотр оставшихся лимитов.
 
-```powershell
-irm https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-windows.ps1 | iex
-```
+---
 
-Скрипты установят нужные npm-пакеты и создадут готовые launchers в папке:
+## ⚙️ Настройка Claude Desktop (Делается 1 раз)
 
-```text
-Documents/ClaudeGravity
-```
+Когда откроется приложение **Claude Desktop**:
 
-## Что появится
+1. **Включите режим разработчика**:
+   - В верхнем меню нажмите **Help** ➔ **Troubleshooting** ➔ **Enable Developer Mode** *(или через Settings ➔ Developer)*.
+2. **Переключите режим на Code**:
+   - В верхней части окна выберите режим **Code** *(вместо Cowork, чтобы экономно расходовать лимиты)*.
+3. **Выберите модель**:
+   - Внизу экрана в списке моделей выберите `gemini-3.6-flash-high (Antigravity) 1M`.
 
-macOS:
+---
 
-```text
-ClaudeGravity.command
-ClaudeGravity-AccountAdd.command
-ClaudeGravity-Limits.command
-```
+## 🛠 Полезные команды (если нужно вручную)
 
-Windows:
+| Действие | Команда |
+|---|---|
+| Привязать ещё аккаунт Google | `acc accounts add` |
+| Перезапустить прокси | `acc restart` |
+| Проверить статус прокси | `acc status` |
 
-```text
-ClaudeGravity.ps1
-ClaudeGravity.cmd
-ClaudeGravity-AccountAdd.ps1
-ClaudeGravity-AccountAdd.cmd
-ClaudeGravity-Limits.ps1
-ClaudeGravity-Limits.cmd
-```
+---
 
-## Первый запуск
+## ❤️ Использованные проекты
 
-1. Добавь Antigravity/Google аккаунт:
-
-   ```bash
-   acc accounts add
-   ```
-
-2. Запусти `ClaudeGravity` launcher из `Documents/ClaudeGravity`.
-
-3. В Claude Desktop включи **Developer Mode**, выбери режим **Code** и модель Antigravity внизу окна (подробности ниже).
-
-## Пошаговое руководство: Developer Mode & Code Mode в Claude Desktop
-
-Чтобы Claude Desktop корректно перенаправлял запросы через Relay AI и Antigravity Proxy, выполни следующие шаги:
-
-### 1. Включение Developer Mode (Режим разработчика)
-
-1. Открой **Claude Desktop**.
-2. В верхнем меню выбери **Help** ➔ **Troubleshooting** ➔ **Enable Developer Mode** (Включить режим разработчика).
-   - *Альтернативно*: Открой **Settings** (`Cmd + ,` на macOS или `Ctrl + ,` на Windows) ➔ раздел **Developer** ➔ переключатель **Developer Mode**.
-3. Перезапусти Claude Desktop, если приложение запросит перезагрузку.
-
-### 2. Переключение в режим Code mode
-
-1. В главном интерфейсе Claude Desktop найди переключатель рабочих режимов (в верхней части экрана или рядом с полем ввода).
-2. Переключи режим с **Cowork** (Совместная работа) на **Code** (Код / Программирование).
-
-> ⚠️ **Почему важен Code mode:**
-> - **Cowork mode** активнее фоново вызывает дополнительные инструменты, создает автономные под-агенты и циклы. Это мгновенно увеличивает расход токенов и приводит к частым временным ошибкам лимитов/кулдауна (`isRateLimited: true`).
-> - **Code mode** предназначен для прямого интерактивного парного программирования с файлами и консолью, работая стабильнее и экономя лимиты.
-
-### 3. Выбор модели
-
-1. Нажми на выпадающий список выбора моделей внизу поля ввода сообщения (рядом с кнопкой отправки).
-2. Выбери кастомную модель Antigravity, например:
-
-   ```text
-   gemini-3.6-flash-high (Antigravity) 1M
-   ```
-
-3. Теперь вы готовы к работе через локальный прокси!
-
-## Лимиты без открытия Antigravity
-
-macOS:
-
-```bash
-~/Documents/ClaudeGravity/ClaudeGravity-Limits.command
-```
-
-Windows:
-
-```powershell
-.\ClaudeGravity-Limits.ps1
-```
-
-Или вручную:
-
-```bash
-curl -s http://127.0.0.1:8080/health | jq
-```
-
-Windows без `jq`:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8080/health | ConvertTo-Json -Depth 20
-```
-
-## Если что-то сломалось
-
-Перезапустить proxy:
-
-```bash
-acc restart
-```
-
-Остановить proxy:
-
-```bash
-acc stop
-```
-
-Открыть локальную панель proxy:
-
-```bash
-acc ui
-```
-
-Проверить локальные cooldown-флаги:
-
-```bash
-curl -s http://127.0.0.1:8080/health | jq '.accounts[0].modelRateLimits'
-```
-
-Если `models` показывает нормальный лимит, но `modelRateLimits` содержит `isRateLimited: true`, значит это локальный cooldown proxy. Обычно проще подождать reset или сделать `acc restart`.
+Сборка работает на основе открытых инструментов:
+- [antigravity-claude-proxy](https://www.npmjs.com/package/antigravity-claude-proxy) — прокси-сервер Google Antigravity (`acc`).
+- [@jacobbd/relay-ai](https://www.npmjs.com/package/@jacobbd/relay-ai) — мост для Claude Desktop (`relay-ai`).
+- [Claude Desktop](https://claude.ai/download) — клиент Anthropic.
