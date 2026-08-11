@@ -40,7 +40,7 @@ else
   printf "%s\n" "$PATH_LINE" > "$ZSHRC"
 fi
 
-say "Установка прокси и реле..."
+say "Установка компонентов прокси и реле..."
 npm install -g antigravity-claude-proxy @jacobbd/relay-ai
 
 say "Создаю ярлыки в папке ${INSTALL_DIR}..."
@@ -59,35 +59,36 @@ printf "         ClaudeGravity Launcher          \n"
 printf "=========================================\n\n"
 
 command -v relay-ai >/dev/null 2>&1 || {
-  printf "Ошибка: Relay AI не установлен. Выполните установку заново.\n"
+  printf "Ошибка: Relay AI не установлен. Запустите установщик заново.\n"
   read -k 1; exit 1
 }
 
-# 1. Запуск прокси
-if ! curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
-  printf "Запускаю Antigravity proxy...\n"
-  acc start || true
-  sleep 2
-fi
+# 1. Проверяем привязанные аккаунты Google
+ACCOUNT_COUNT=$(acc accounts list 2>/dev/null | grep -o '[0-9]* account(s)' | awk '{print $1}')
 
-# 2. Проверка привязанных аккаунтов
-HEALTH_DATA=$(curl -s "$HEALTH_URL" 2>/dev/null)
-ACCOUNT_COUNT=$(echo "$HEALTH_DATA" | grep -o '"email":' | wc -l | tr -d ' ')
-
-if [ "$ACCOUNT_COUNT" -eq 0 ]; then
-  printf "\n[!] Не найдено привязанных аккаунтов Google/Antigravity.\n"
-  read "add_acc?Привязать аккаунт прямо сейчас? [Y/n]: "
+if [ -z "$ACCOUNT_COUNT" ] || [ "$ACCOUNT_COUNT" -eq 0 ]; then
+  printf "[!] Не найдено привязанных аккаунтов Google (Google AI / Antigravity).\n"
+  read "add_acc?Привязать аккаунт Google прямо сейчас? [Y/n]: "
   add_acc=${add_acc:-Y}
   if [[ "$add_acc" =~ ^[Yy]$ ]]; then
+    printf "\nОстанавливаю прокси для привязки аккаунта...\n"
+    acc stop >/dev/null 2>&1 || true
     acc accounts add
   fi
+fi
+
+# 2. Запускаем прокси, если не запущен
+if ! curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
+  printf "\nЗапускаю Antigravity proxy...\n"
+  acc start || true
+  sleep 2
 fi
 
 printf "\n[✓] Запускаю Claude Desktop через прокси...\n\n"
 printf "Напоминание для Claude Desktop:\n"
 printf " • Включите Developer Mode: Help -> Troubleshooting -> Enable Developer Mode\n"
 printf " • Переключите режим на: Code\n"
-printf " • Выберите модель: gemini-3.6-flash-high (Antigravity) 1M\n\n"
+printf " • Выберите любую модель Google/Antigravity внизу окна\n\n"
 
 relay-ai claude-app
 EOF

@@ -21,27 +21,32 @@ if (-not (Get-Command relay-ai -ErrorAction SilentlyContinue)) {
   exit 1
 }
 
-# 1. Проверка и запуск прокси
+# 1. Проверяем привязанные аккаунты Google
+$accList = cmd.exe /c "acc accounts list" 2>$null
+$hasAccount = $false
+if ($accList -match "([1-9][0-9]*) account\(s\)") {
+  $hasAccount = $true
+}
+
+if (-not $hasAccount) {
+  Write-Host "[!] Не найдено привязанных аккаунтов Google (Google AI / Antigravity)."
+  $reply = Read-Host "Привязать аккаунт Google прямо сейчас? [Y/n]"
+  if ($reply -eq "" -or $reply -match "^[Yy]") {
+    Write-Host "Останавливаю прокси перед привязкой..."
+    acc stop | Out-Null
+    cmd.exe /c "acc accounts add"
+  }
+}
+
+# 2. Проверяем и запускаем прокси
 try {
   $res = Invoke-RestMethod $HealthUrl -TimeoutSec 2
 } catch {
+  Write-Host ""
   Write-Host "Запускаю Antigravity proxy..."
   acc start
   Start-Sleep -Seconds 2
 }
-
-# 2. Проверка привязанных аккаунтов
-try {
-  $health = Invoke-RestMethod $HealthUrl -TimeoutSec 3
-  if (-not $health.accounts -or $health.accounts.Count -eq 0) {
-    Write-Host ""
-    Write-Host "[!] Не найдено привязанных аккаунтов Google/Antigravity."
-    $reply = Read-Host "Привязать аккаунт прямо сейчас? [Y/n]"
-    if ($reply -eq "" -or $reply -match "^[Yy]") {
-      cmd.exe /c "acc accounts add"
-    }
-  }
-} catch {}
 
 Write-Host ""
 Write-Host "[✓] Запускаю Claude Desktop..."
@@ -49,7 +54,7 @@ Write-Host ""
 Write-Host "Напоминание для Claude Desktop:"
 Write-Host " 1. Меню Help -> Troubleshooting -> Enable Developer Mode"
 Write-Host " 2. Переключите режим на: Code"
-Write-Host " 3. Выберите модель: gemini-3.6-flash-high (Antigravity) 1M"
+Write-Host " 3. Выберите любую доступную модель Google внизу окна"
 Write-Host ""
 
 relay-ai claude-app
