@@ -77,6 +77,38 @@ printf "\nГотово. Нажмите любую клавишу..."
 read -k 1
 EOF
 
+cat > "${INSTALL_DIR}/ClaudeGravity-AccountAdd.command" <<'EOF'
+#!/bin/zsh
+
+export PATH="$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+clear
+printf "ClaudeGravity - Привязка аккаунта\n\n"
+
+if command -v acc >/dev/null 2>&1; then
+  printf "Запускаю привязку Google/Antigravity аккаунта...\n\n"
+  acc accounts add
+else
+  printf "Ошибка: утилита 'acc' (antigravity-claude-proxy) не найдена.\n"
+  printf "Установите её командой: npm install -g antigravity-claude-proxy\n\n"
+  printf "Нажмите любую клавишу..."
+  read -k 1
+  exit 1
+fi
+
+printf "\n--- Запуск ClaudeGravity ---\n"
+read "reply?Хотите запустить ClaudeGravity прямо сейчас? [Y/n]: "
+reply=${reply:-Y}
+
+if [[ "$reply" =~ ^[Yy]$ ]]; then
+  printf "\nНапоминание для Claude Desktop:\n"
+  printf " 1. Меню Help -> Troubleshooting -> Enable Developer Mode\n"
+  printf " 2. Переключите режим с 'Cowork' на 'Code'\n"
+  printf " 3. Выберите модель: gemini-3.6-flash-high (Antigravity) 1M\n\n"
+  exec "$(dirname "$0")/ClaudeGravity.command"
+fi
+EOF
+
 cat > "${INSTALL_DIR}/ClaudeGravity-Limits.command" <<'EOF'
 #!/bin/zsh
 
@@ -95,30 +127,11 @@ printf "\nНажмите любую клавишу..."
 read -k 1
 EOF
 
-chmod +x "${INSTALL_DIR}/ClaudeGravity.command" "${INSTALL_DIR}/ClaudeGravity-Limits.command"
+chmod +x "${INSTALL_DIR}/ClaudeGravity.command" "${INSTALL_DIR}/ClaudeGravity-AccountAdd.command" "${INSTALL_DIR}/ClaudeGravity-Limits.command"
 xattr -d com.apple.quarantine "${INSTALL_DIR}/ClaudeGravity.command" 2>/dev/null || true
+xattr -d com.apple.quarantine "${INSTALL_DIR}/ClaudeGravity-AccountAdd.command" 2>/dev/null || true
 xattr -d com.apple.quarantine "${INSTALL_DIR}/ClaudeGravity-Limits.command" 2>/dev/null || true
 
 say "Установка успешно завершена!"
 
-# Поэтапная интерактивная настройка
-printf "\n--- Пошаговый запуск ---\n"
-read -p "Шаг 1/2: Добавить Google/Antigravity аккаунт прямо сейчас? [Y/n]: " reply1
-reply1=${reply1:-Y}
-if [[ "$reply1" =~ ^[Yy]$ ]]; then
-  say "Запускаю привязку аккаунта..."
-  acc accounts add || true
-fi
-
-printf "\n"
-read -p "Шаг 2/2: Запустить ClaudeGravity прямо сейчас? [Y/n]: " reply2
-reply2=${reply2:-Y}
-if [[ "$reply2" =~ ^[Yy]$ ]]; then
-  say "Напоминание для Claude Desktop:"
-  printf " 1. Меню Help -> Troubleshooting -> Enable Developer Mode\n"
-  printf " 2. Переключите режим с 'Cowork' на 'Code'\n"
-  printf " 3. Внизу выберите модель: gemini-3.6-flash-high (Antigravity) 1M\n\n"
-  exec "${INSTALL_DIR}/ClaudeGravity.command"
-else
-  printf "\nГотово! Запустить прокси всегда можно через файл:\n  %s/ClaudeGravity.command\n\n" "$INSTALL_DIR"
-fi
+exec "${INSTALL_DIR}/ClaudeGravity-AccountAdd.command"

@@ -75,6 +75,54 @@ powershell -ExecutionPolicy Bypass -File "%~dp0ClaudeGravity.ps1"
 '@ | Set-Content -Encoding ASCII (Join-Path $InstallDir "ClaudeGravity.cmd")
 
 @'
+$ErrorActionPreference = "Continue"
+
+$NpmUserDir = Join-Path $env:APPDATA "npm"
+$env:Path = "$NpmUserDir;$env:Path"
+
+function Pause-End {
+  Write-Host ""
+  Write-Host "Press any key to close..."
+  [Console]::ReadKey($true) | Out-Null
+}
+
+Clear-Host
+Write-Host "ClaudeGravity - Account Binding"
+Write-Host ""
+
+if (-not (Get-Command acc -ErrorAction SilentlyContinue)) {
+  Write-Host "Antigravity proxy (acc) not found in PATH."
+  Write-Host "Install it via: npm install -g antigravity-claude-proxy"
+  Pause-End
+  exit 1
+}
+
+Write-Host "Launching Google/Antigravity account binding..."
+Write-Host ""
+
+cmd.exe /c "acc accounts add"
+
+Write-Host ""
+Write-Host "--- Launch ClaudeGravity ---"
+$reply = Read-Host "Would you like to launch ClaudeGravity now? [Y/n]"
+if ($reply -eq "" -or $reply -match "^[Yy]") {
+  Write-Host ""
+  Write-Host "Reminders for Claude Desktop:"
+  Write-Host " 1. Menu Help -> Troubleshooting -> Enable Developer Mode"
+  Write-Host " 2. Switch mode from 'Cowork' to 'Code'"
+  Write-Host " 3. Select model: gemini-3.6-flash-high (Antigravity) 1M"
+  Write-Host ""
+  $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+  & (Join-Path $scriptDir "ClaudeGravity.ps1")
+}
+'@ | Set-Content -Encoding UTF8 (Join-Path $InstallDir "ClaudeGravity-AccountAdd.ps1")
+
+@'
+@echo off
+powershell -ExecutionPolicy Bypass -File "%~dp0ClaudeGravity-AccountAdd.ps1"
+'@ | Set-Content -Encoding ASCII (Join-Path $InstallDir "ClaudeGravity-AccountAdd.cmd")
+
+@'
 Clear-Host
 Write-Host "ClaudeGravity limits"
 Write-Host ""
@@ -98,27 +146,4 @@ powershell -ExecutionPolicy Bypass -File "%~dp0ClaudeGravity-Limits.ps1"
 
 Say "Установка успешно завершена!"
 
-Write-Host ""
-Write-Host "--- Пошаговый запуск ---"
-$step1 = Read-Host "Шаг 1/2: Добавить Google/Antigravity аккаунт прямо сейчас? [Y/n]"
-if ($step1 -eq "" -or $step1 -match "^[Yy]") {
-    Say "Запускаю привязку аккаунта..."
-    try { acc accounts add } catch {}
-}
-
-Write-Host ""
-$step2 = Read-Host "Шаг 2/2: Запустить ClaudeGravity прямо сейчас? [Y/n]"
-if ($step2 -eq "" -or $step2 -match "^[Yy]") {
-    Write-Host ""
-    Write-Host "Напоминание для Claude Desktop:"
-    Write-Host " 1. Меню Help -> Troubleshooting -> Enable Developer Mode"
-    Write-Host " 2. Переключите режим с 'Cowork' на 'Code'"
-    Write-Host " 3. Внизу выберите модель: gemini-3.6-flash-high (Antigravity) 1M"
-    Write-Host ""
-    & (Join-Path $InstallDir "ClaudeGravity.ps1")
-} else {
-    Write-Host ""
-    Write-Host "Готово! Запустить прокси всегда можно через файл:"
-    Write-Host "  $InstallDir\ClaudeGravity.cmd"
-    Write-Host ""
-}
+& (Join-Path $InstallDir "ClaudeGravity-AccountAdd.ps1")

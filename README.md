@@ -53,6 +53,7 @@ macOS:
 
 ```text
 ClaudeGravity.command
+ClaudeGravity-AccountAdd.command
 ClaudeGravity-Limits.command
 ```
 
@@ -61,6 +62,8 @@ Windows:
 ```text
 ClaudeGravity.ps1
 ClaudeGravity.cmd
+ClaudeGravity-AccountAdd.ps1
+ClaudeGravity-AccountAdd.cmd
 ClaudeGravity-Limits.ps1
 ClaudeGravity-Limits.cmd
 ```
