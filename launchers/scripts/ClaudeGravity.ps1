@@ -15,7 +15,7 @@ function Ensure-RelayProvider {
   $needsConfig = $true
   if (Test-Path $providersJsonPath) {
     $content = Get-Content $providersJsonPath -Raw -ErrorAction SilentlyContinue
-    if ($content -match "env:ANTIGRAVITY_API_KEY") {
+    if ($content -match "env:ANTIGRAVITY_API_KEY" -and $content -match "gemini") {
       $needsConfig = $false
     }
   }
