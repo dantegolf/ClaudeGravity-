@@ -50,6 +50,7 @@ cat > "${INSTALL_DIR}/ClaudeGravity.command" <<'EOF'
 #!/bin/zsh
 
 export PATH="$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+export ANTIGRAVITY_API_KEY="antigravity"
 
 HEALTH_URL="http://127.0.0.1:8080/health"
 RELAY_DIR="${HOME}/.relay-ai"
@@ -77,7 +78,7 @@ if [ ! -f "$PROVIDERS_JSON" ] || ! grep -q '"custom-antigravity"' "$PROVIDERS_JS
       "templateId": "custom-anthropic",
       "name": "Antigravity",
       "enabled": true,
-      "authRef": "keyring:provider:custom-antigravity",
+      "authRef": "env:ANTIGRAVITY_API_KEY",
       "api": {
         "npm": "@ai-sdk/anthropic",
         "url": "http://127.0.0.1:8080"
