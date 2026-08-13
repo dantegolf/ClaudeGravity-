@@ -1,0 +1,27 @@
+name: Installers
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate with Windows PowerShell 5.1
+        shell: powershell
+        run: .\tests\windows-installer.ps1
+      - name: Validate with PowerShell 7
+        shell: pwsh
+        run: .\tests\windows-installer.ps1
+
+  unix:
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate macOS and Linux installers
+        run: bash tests/unix-installer.sh
