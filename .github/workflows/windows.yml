@@ -1,0 +1,17 @@
+name: Windows installer
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate with Windows PowerShell 5.1
+        shell: powershell
+        run: .\tests\windows-installer.ps1
+      - name: Validate with PowerShell 7
+        shell: pwsh
+        run: .\tests\windows-installer.ps1

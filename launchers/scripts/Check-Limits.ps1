@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Continue"
+﻿$ErrorActionPreference = "Continue"
 Clear-Host
 Write-Host "=== Лимиты ClaudeGravity ==="
 Write-Host ""

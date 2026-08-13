@@ -26,6 +26,9 @@
   irm https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-windows.ps1 | iex
   ```
 
+  Если предыдущая установка на Windows завершилась ошибкой, запустите эту же
+  команду ещё раз: установщик восстановит конфигурацию и проверит запуск.
+
 ---
 
 ## 📂 Что появится после установки
