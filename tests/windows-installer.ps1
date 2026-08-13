@@ -98,6 +98,7 @@ foreach ($required in @(
   'npm.cmd',
   'acc.cmd',
   'relay-ai.cmd',
+  '$providerOutput = $providerList -join [Environment]::NewLine',
   'antigravity-claude-proxy@2.8.5',
   '@jacobbd/relay-ai@0.9.0'
 )) {
