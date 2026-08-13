@@ -18,7 +18,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $installerPath = Join-Path $root "install-windows.ps1"
 $launcherPath = Join-Path $root "launchers\scripts\ClaudeGravity.ps1"
 $installerAst = Parse-Script $installerPath
-Parse-Script $launcherPath | Out-Null
+$launcherAst = Parse-Script $launcherPath
 
 $assignment = $installerAst.FindAll({
   param($node)
@@ -47,7 +47,7 @@ if ($generated -ne $launcher) {
   }
 }
 
-$writer = (Parse-Script $launcherPath).FindAll({
+$writer = $launcherAst.FindAll({
   param($node)
   $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -eq 'Write-Utf8NoBom'
@@ -63,6 +63,34 @@ try {
   Get-Content -LiteralPath $tempJson -Raw | ConvertFrom-Json | Out-Null
 } finally {
   Remove-Item -LiteralPath $tempJson -Force -ErrorAction SilentlyContinue
+}
+
+$ensureProvider = $launcherAst.FindAll({
+  param($node)
+  $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -eq 'Ensure-RelayProvider'
+}, $true) | Select-Object -First 1
+Invoke-Expression $ensureProvider.Extent.Text
+$previousRelayHome = $env:RELAY_AI_HOME
+$tempRelayHome = Join-Path ([System.IO.Path]::GetTempPath()) "claudegravity-$([guid]::NewGuid())"
+try {
+  New-Item -ItemType Directory -Path $tempRelayHome | Out-Null
+  $env:RELAY_AI_HOME = $tempRelayHome
+  $staleConfig = '{"schemaVersion":1,"providers":[{"id":"custom-antigravity","templateId":"custom-anthropic","name":"Antigravity","enabled":true,"addedAt":"2026-08-11T00:00:00.000Z","api":{"url":"http://127.0.0.1:8080"},"modelsCache":{"models":[{"id":"gemini-3.6-flash-high"}]}}]}'
+  Write-Utf8NoBom (Join-Path $tempRelayHome "providers.json") $staleConfig
+
+  Ensure-RelayProvider
+
+  $repairedConfig = Get-Content -LiteralPath (Join-Path $tempRelayHome "providers.json") -Raw | ConvertFrom-Json
+  $repairedProvider = @($repairedConfig.providers | Where-Object { $_.id -eq "custom-antigravity" })[0]
+  if (-not $repairedProvider -or
+      $repairedProvider.authRef -ne "keyring:provider:custom-antigravity" -or
+      $repairedProvider.api.npm -ne "@ai-sdk/anthropic") {
+    throw 'Ensure-RelayProvider did not repair a stale Antigravity provider.'
+  }
+} finally {
+  $env:RELAY_AI_HOME = $previousRelayHome
+  Remove-Item -LiteralPath $tempRelayHome -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 foreach ($required in @(
