@@ -78,6 +78,7 @@ try {
   $env:RELAY_AI_HOME = $tempRelayHome
   $staleConfig = '{"schemaVersion":1,"providers":[{"id":"custom-antigravity","templateId":"custom-anthropic","name":"Antigravity","enabled":true,"addedAt":"2026-08-11T00:00:00.000Z","api":{"url":"http://127.0.0.1:8080"},"modelsCache":{"models":[{"id":"gemini-3.6-flash-high"}]}}]}'
   Write-Utf8NoBom (Join-Path $tempRelayHome "providers.json") $staleConfig
+  Write-Utf8NoBom (Join-Path $tempRelayHome "config.json") '{"theme":"dark","favoriteModels":[{"providerId":"other","modelId":"existing"}]}'
 
   Ensure-RelayProvider
 
@@ -87,6 +88,33 @@ try {
       $repairedProvider.authRef -ne "keyring:provider:custom-antigravity" -or
       $repairedProvider.api.npm -ne "@ai-sdk/anthropic") {
     throw 'Ensure-RelayProvider did not repair a stale Antigravity provider.'
+  }
+
+  $preferencesPath = Join-Path $tempRelayHome "config.json"
+  $preferences = Get-Content -LiteralPath $preferencesPath -Raw | ConvertFrom-Json
+  $favoriteIds = @($preferences.favoriteModels | ForEach-Object { "$($_.providerId)/$($_.modelId)" })
+  foreach ($expectedFavorite in @(
+    "other/existing",
+    "custom-antigravity/gemini-3.6-flash-high",
+    "custom-antigravity/gemini-3.1-pro-high",
+    "custom-antigravity/claude-sonnet-4-6",
+    "custom-antigravity/claude-opus-4-6-thinking",
+    "custom-antigravity/gemini-2.5-pro"
+  )) {
+    if ($favoriteIds -notcontains $expectedFavorite) {
+      throw "Missing Relay AI favorite: $expectedFavorite"
+    }
+  }
+  if ($preferences.theme -ne "dark" -or $preferences.claudeGravityFavoritesVersion -ne 1) {
+    throw 'Ensure-RelayProvider did not preserve Relay preferences or mark the favorites preset.'
+  }
+
+  $preferences.favoriteModels = @($preferences.favoriteModels | Where-Object { $_.modelId -ne "gemini-2.5-pro" })
+  Write-Utf8NoBom $preferencesPath ($preferences | ConvertTo-Json -Depth 20)
+  Ensure-RelayProvider
+  $preferences = Get-Content -LiteralPath $preferencesPath -Raw | ConvertFrom-Json
+  if (@($preferences.favoriteModels | Where-Object { $_.modelId -eq "gemini-2.5-pro" }).Count -ne 0) {
+    throw 'Ensure-RelayProvider restored a favorite that the user removed.'
   }
 } finally {
   $env:RELAY_AI_HOME = $previousRelayHome
