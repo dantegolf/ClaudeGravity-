@@ -49,6 +49,7 @@ mkdir -p "$SCRIPTS_DIR"
 download "launchers/scripts/ClaudeGravity.sh" "${SCRIPTS_DIR}/ClaudeGravity.sh"
 download "launchers/scripts/Check-Limits.sh" "${SCRIPTS_DIR}/Check-Limits.sh"
 download "launchers/scripts/configure-relay.mjs" "${SCRIPTS_DIR}/configure-relay.mjs"
+download "launchers/scripts/patch-antigravity-proxy.mjs" "${SCRIPTS_DIR}/patch-antigravity-proxy.mjs"
 download "launchers/ClaudeGravity.command" "${INSTALL_DIR}/ClaudeGravity.command"
 download "launchers/Check-Limits.command" "${INSTALL_DIR}/Check-Limits.command"
 
@@ -56,6 +57,7 @@ chmod +x "${INSTALL_DIR}/ClaudeGravity.command" "${INSTALL_DIR}/Check-Limits.com
 xattr -dr com.apple.quarantine "$INSTALL_DIR" 2>/dev/null || true
 bash -n "${SCRIPTS_DIR}/ClaudeGravity.sh" "${SCRIPTS_DIR}/Check-Limits.sh"
 node --check "${SCRIPTS_DIR}/configure-relay.mjs"
+node --check "${SCRIPTS_DIR}/patch-antigravity-proxy.mjs"
 
 say "Готово. Запускаю ClaudeGravity..."
 [ "${CLAUDEGRAVITY_SKIP_LAUNCH:-0}" = "1" ] && exit 0

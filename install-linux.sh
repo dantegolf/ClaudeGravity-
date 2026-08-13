@@ -65,12 +65,14 @@ mkdir -p "$SCRIPTS_DIR" "${HOME}/.local/share/applications"
 download "launchers/scripts/ClaudeGravity.sh" "${SCRIPTS_DIR}/ClaudeGravity.sh"
 download "launchers/scripts/Check-Limits.sh" "${SCRIPTS_DIR}/Check-Limits.sh"
 download "launchers/scripts/configure-relay.mjs" "${SCRIPTS_DIR}/configure-relay.mjs"
+download "launchers/scripts/patch-antigravity-proxy.mjs" "${SCRIPTS_DIR}/patch-antigravity-proxy.mjs"
 download "launchers/ClaudeGravity.sh" "${INSTALL_DIR}/ClaudeGravity.sh"
 download "launchers/Check-Limits.sh" "${INSTALL_DIR}/Check-Limits.sh"
 
 chmod +x "${INSTALL_DIR}"/*.sh "${SCRIPTS_DIR}"/*.sh "${SCRIPTS_DIR}"/*.mjs
 bash -n "${SCRIPTS_DIR}/ClaudeGravity.sh" "${SCRIPTS_DIR}/Check-Limits.sh"
 node --check "${SCRIPTS_DIR}/configure-relay.mjs"
+node --check "${SCRIPTS_DIR}/patch-antigravity-proxy.mjs"
 
 cat > "${HOME}/.local/share/applications/claudegravity.desktop" <<EOF
 [Desktop Entry]

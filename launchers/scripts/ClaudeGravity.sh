@@ -30,9 +30,15 @@ if command -v npm >/dev/null 2>&1; then
   if ! npm install -g antigravity-claude-proxy@latest @jacobbd/relay-ai@latest --no-audit --no-fund; then
     printf "[!] Обновление не удалось; использую установленные версии.\n" >&2
   fi
+  proxy_root="$(npm root -g 2>/dev/null)/antigravity-claude-proxy"
+  node "${SCRIPT_DIR}/patch-antigravity-proxy.mjs" "$proxy_root" || \
+    fail "Установленный Antigravity proxy несовместим с протоколом 2.8. Переустановите ClaudeGravity или обновите compatibility patch."
 fi
 command -v acc >/dev/null 2>&1 || fail "Antigravity proxy не найден. Запустите установщик заново."
 command -v relay-ai >/dev/null 2>&1 || fail "Relay AI не найден. Запустите установщик заново."
+
+# A running Node process keeps the pre-update modules in memory.
+acc stop >/dev/null 2>&1 || true
 
 node "${SCRIPT_DIR}/configure-relay.mjs" "$RELAY_AI_HOME" || fail "Не удалось подготовить конфигурацию Relay AI."
 

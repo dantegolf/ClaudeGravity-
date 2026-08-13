@@ -145,6 +145,8 @@ foreach ($required in @(
   '$providerOutput = $providerList -join [Environment]::NewLine',
   'antigravity-claude-proxy@latest',
   '@jacobbd/relay-ai@latest',
+  'patch-antigravity-proxy.mjs',
+  'npmRoot',
   'Проверяю обновления компонентов'
 )) {
   if ((Get-Content -LiteralPath $installerPath -Raw) -notmatch [regex]::Escape($required)) {

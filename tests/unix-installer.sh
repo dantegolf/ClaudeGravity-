@@ -13,15 +13,19 @@ bash -n \
   "${ROOT}/launchers/scripts/ClaudeGravity.sh" \
   "${ROOT}/launchers/scripts/Check-Limits.sh"
 node --check "${ROOT}/launchers/scripts/configure-relay.mjs"
+node --check "${ROOT}/launchers/scripts/patch-antigravity-proxy.mjs"
+node "${ROOT}/tests/proxy-compat.mjs"
 
 for installer in "${ROOT}/install-macos.sh" "${ROOT}/install-linux.sh"; do
   grep -Fq 'antigravity-claude-proxy@latest' "$installer"
   grep -Fq '@jacobbd/relay-ai@latest' "$installer"
   grep -Fq 'launchers/scripts/configure-relay.mjs' "$installer"
+  grep -Fq 'launchers/scripts/patch-antigravity-proxy.mjs' "$installer"
 done
 
 grep -Fq 'npm install -g antigravity-claude-proxy@latest @jacobbd/relay-ai@latest' \
   "${ROOT}/launchers/scripts/ClaudeGravity.sh"
+grep -Fq 'patch-antigravity-proxy.mjs' "${ROOT}/launchers/scripts/ClaudeGravity.sh"
 
 run_installer() {
   local installer="$1" expected_launcher="$2"

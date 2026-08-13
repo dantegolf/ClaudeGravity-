@@ -154,6 +154,12 @@ function Start-ClaudeGravity {
     if ($LASTEXITCODE -ne 0) {
       Write-Host "[!] Обновление не удалось; использую установленные версии." -ForegroundColor Yellow
     }
+    $npmRoot = (& $npmCommand.Source root -g | Select-Object -Last 1).Trim()
+    $proxyRoot = Join-Path $npmRoot "antigravity-claude-proxy"
+    & node.exe (Join-Path $PSScriptRoot "patch-antigravity-proxy.mjs") $proxyRoot
+    if ($LASTEXITCODE -ne 0) {
+      throw "Установленный Antigravity proxy несовместим с протоколом 2.8. Переустановите ClaudeGravity или обновите compatibility patch."
+    }
     Write-Host ""
   }
 
@@ -162,6 +168,9 @@ function Start-ClaudeGravity {
   if (-not $relayCommand -or -not $accCommand) {
     throw "Компоненты ClaudeGravity не найдены. Запустите установщик заново."
   }
+
+  # Запущенный Node-процесс продолжает использовать модули до обновления.
+  & $accCommand.Source stop | Out-Null
 
   # 1. Проверяем регистрацию провайдера Antigravity в relay-ai
   Ensure-RelayProvider

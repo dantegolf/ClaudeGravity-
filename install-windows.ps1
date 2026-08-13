@@ -6,6 +6,7 @@ $NpmUserDir = Join-Path $env:APPDATA "npm"
 $NodeDir = Join-Path $env:ProgramFiles "nodejs"
 $ProxyPackage = "antigravity-claude-proxy@latest"
 $RelayPackage = "@jacobbd/relay-ai@latest"
+$RawBase = if ($env:CLAUDEGRAVITY_RAW_BASE) { $env:CLAUDEGRAVITY_RAW_BASE } else { "https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main" }
 
 function Say($Message) {
   Write-Host ""
@@ -53,6 +54,12 @@ if (-not (Get-Command acc.cmd -ErrorAction SilentlyContinue) -or -not (Get-Comma
 
 Say "Создаю ярлыки в $InstallDir..."
 New-Item -ItemType Directory -Force -Path $ScriptsDir | Out-Null
+$patchScriptPath = Join-Path $ScriptsDir "patch-antigravity-proxy.mjs"
+Invoke-WebRequest -UseBasicParsing "$RawBase/launchers/scripts/patch-antigravity-proxy.mjs" -OutFile $patchScriptPath
+& node.exe --check $patchScriptPath
+if ($LASTEXITCODE -ne 0) {
+  throw "Загруженный compatibility patch содержит синтаксическую ошибку."
+}
 
 $claudePs1 = @(
   '$ErrorActionPreference = "Stop"',
@@ -211,6 +218,12 @@ $claudePs1 = @(
   '    if ($LASTEXITCODE -ne 0) {',
   '      Write-Host "[!] Обновление не удалось; использую установленные версии." -ForegroundColor Yellow',
   '    }',
+  '    $npmRoot = (& $npmCommand.Source root -g | Select-Object -Last 1).Trim()',
+  '    $proxyRoot = Join-Path $npmRoot "antigravity-claude-proxy"',
+  '    & node.exe (Join-Path $PSScriptRoot "patch-antigravity-proxy.mjs") $proxyRoot',
+  '    if ($LASTEXITCODE -ne 0) {',
+  '      throw "Установленный Antigravity proxy несовместим с протоколом 2.8. Переустановите ClaudeGravity или обновите compatibility patch."',
+  '    }',
   '    Write-Host ""',
   '  }',
   '',
@@ -219,6 +232,9 @@ $claudePs1 = @(
   '  if (-not $relayCommand -or -not $accCommand) {',
   '    throw "Компоненты ClaudeGravity не найдены. Запустите установщик заново."',
   '  }',
+  '',
+  '  # Запущенный Node-процесс продолжает использовать модули до обновления.',
+  '  & $accCommand.Source stop | Out-Null',
   '',
   '  # 1. Проверяем регистрацию провайдера Antigravity в relay-ai',
   '  Ensure-RelayProvider',
