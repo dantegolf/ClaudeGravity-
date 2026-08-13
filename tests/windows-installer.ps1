@@ -3,8 +3,11 @@
 function Parse-Script($Path) {
   $tokens = $null
   $errors = $null
-  $ast = [System.Management.Automation.Language.Parser]::ParseFile(
-    (Resolve-Path $Path),
+  $resolvedPath = (Resolve-Path $Path).Path
+  $content = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($resolvedPath)).TrimStart([char]0xFEFF)
+  $ast = [System.Management.Automation.Language.Parser]::ParseInput(
+    $content,
+    $resolvedPath,
     [ref]$tokens,
     [ref]$errors
   )
@@ -17,6 +20,10 @@ function Parse-Script($Path) {
 $root = Split-Path $PSScriptRoot -Parent
 $installerPath = Join-Path $root "install-windows.ps1"
 $launcherPath = Join-Path $root "launchers\scripts\ClaudeGravity.ps1"
+$installerBytes = [System.IO.File]::ReadAllBytes($installerPath)
+if ($installerBytes.Count -ge 3 -and $installerBytes[0] -eq 0xEF -and $installerBytes[1] -eq 0xBB -and $installerBytes[2] -eq 0xBF) {
+  throw 'install-windows.ps1 must not contain a UTF-8 BOM because irm | iex treats it as part of the first command in Windows PowerShell 5.1.'
+}
 $installerAst = Parse-Script $installerPath
 $launcherAst = Parse-Script $launcherPath
 

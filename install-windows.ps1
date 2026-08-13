@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $InstallDir = Join-Path $env:USERPROFILE "Documents\ClaudeGravity"
 $ScriptsDir = Join-Path $InstallDir "scripts"

@@ -1,71 +1,138 @@
-![ClaudeGravity Banner](assets/banner.svg)
+<p align="center">
+  <img src="assets/banner.png" alt="ClaudeGravity — несколько AI-моделей в Claude Desktop" width="100%">
+</p>
 
-# ClaudeGravity
+<h1 align="center">ClaudeGravity</h1>
 
-Простая и удобная запуск-сборка для работы в **Claude Desktop** через любые модели от **Google Antigravity / Google AI Studio** (Gemini 3.6 Flash, Gemini Pro, Claude и др.) со своего **аккаунта Google**.
+<p align="center">
+  <strong>Gemini и Claude внутри привычного Claude Desktop.</strong><br>
+  Один установщик, один Google-аккаунт, переключение моделей прямо в интерфейсе.
+</p>
 
----
+<p align="center">
+  <a href="#-установка">Установка</a> ·
+  <a href="#-что-получится">Возможности</a> ·
+  <a href="#-как-это-работает">Как это работает</a> ·
+  <a href="#-решение-проблем">Помощь</a>
+</p>
 
-## 🚀 Как начать за 1 минуту
+> [!CAUTION]
+> ClaudeGravity использует неофициальный прокси и не связан с Anthropic или Google. Разработчики прокси предупреждают о риске ограничений или блокировки Google-аккаунта. Не используйте основной аккаунт и продолжайте только если принимаете этот риск.
 
-### Шаг 1. Подготовка
-1. Скачайте и установите приложение **[Claude Desktop](https://claude.ai/download)**.
-2. Включите **VPN** *(он необходим для стабильной работы Claude и связи с серверами)*.
+## ✦ Что получится
 
-### Шаг 2. Быстрая установка
+- Claude Desktop с моделями Google Antigravity вместо отдельного нового клиента.
+- Пять подготовленных моделей в переключателе: Gemini 3.6 Flash High, Gemini 3.1 Pro High, Gemini 2.5 Pro, Claude Sonnet 4.6 и Claude Opus 4.6 Thinking.
+- Автоматический запуск локального прокси и восстановление повреждённой конфигурации.
+- Привязка Google-аккаунта через браузер; приложение Google Antigravity устанавливать необязательно.
+- Отдельный запускатель для просмотра состояния прокси и лимитов.
+- Одинаковая схема работы на Windows, macOS и Linux.
 
-Вставьте одну команду в консоль и нажмите **Enter**:
+## ↓ Установка
 
-- **macOS** (в программе Терминал):
-  ```bash
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-macos.sh)"
-  ```
+### Перед началом
 
-- **Windows** (в программе PowerShell):
-  ```powershell
-  irm https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-windows.ps1 | iex
-  ```
+1. Установите [Claude Desktop](https://claude.ai/download).
+2. На Linux используйте официальный Claude Desktop для поддерживаемого дистрибутива.
+3. Если сервисы Claude или Google недоступны в вашем регионе, может потребоваться VPN.
 
-  Если предыдущая установка на Windows завершилась ошибкой, запустите эту же
-  команду ещё раз: установщик восстановит конфигурацию и проверит запуск.
+### Windows
 
----
+Откройте обычный **Windows PowerShell** и выполните:
 
-## 📂 Что появится после установки
+```powershell
+irm https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-windows.ps1 | iex
+```
 
-В вашей папке `Документы/ClaudeGravity` создадутся 2 простых файла:
+### macOS
 
-1. **`ClaudeGravity`** — **Основной запуск**. При первом запуске безопасно привяжет ваш **аккаунт Google**, поднимет прокси и сам откроет Claude Desktop.
-2. **`Check-Limits`** — Быстрый просмотр оставшихся лимитов аккаунта.
+Откройте **Терминал** и выполните:
 
----
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-macos.sh)"
+```
 
-## ⚙️ Настройка Claude Desktop (Делается 1 раз)
+### Linux
 
-Когда откроется окно **Claude Desktop**:
+Откройте терминал и выполните:
 
-1. **Включите режим разработчика**:
-   - В верхнем меню нажмите **Help** ➔ **Troubleshooting** ➔ **Enable Developer Mode** *(или через Settings ➔ Developer)*.
-2. **Переключите режим на Code**:
-   - В верхней части окна выберите режим **Code** *(вместо Cowork, чтобы расходовать лимиты экономно)*.
-3. **Выберите модель**:
-   - Нажмите на список моделей внизу экрана и выберите одну из подготовленных моделей Gemini или Claude. При первом запуске Windows-лаунчер добавляет пять основных моделей в избранное Relay AI, чтобы они одновременно появились в списке Claude Desktop.
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-linux.sh)"
+```
 
----
+Linux-установщик поддерживает `apt`, `dnf`, `pacman` и `zypper`. При необходимости он попросит `sudo` только для установки Node.js, npm и curl; сами компоненты ClaudeGravity устанавливаются в профиль пользователя.
 
-## 🛠 Полезные команды (для ручной работы при необходимости)
+## ◉ Первый запуск
+
+Установщик создаёт два запускаемых файла:
+
+| Платформа | Основной запуск | Проверка лимитов |
+|---|---|---|
+| Windows | `Документы\ClaudeGravity\ClaudeGravity.cmd` | `Check-Limits.cmd` |
+| macOS | `Документы/ClaudeGravity/ClaudeGravity.command` | `Check-Limits.command` |
+| Linux | `~/ClaudeGravity/ClaudeGravity.sh` и пункт меню приложений | `Check-Limits.sh` |
+
+При первом запуске:
+
+1. Разрешите привязку Google-аккаунта в браузере.
+2. В Claude Desktop включите **Help → Troubleshooting → Enable Developer Mode**.
+3. Переключитесь в режим **Code**.
+4. Выберите модель в нижнем меню Claude.
+5. Не закрывайте окно ClaudeGravity: в нём работает временный Relay AI gateway.
+
+## ⟳ Как это работает
+
+```text
+Claude Desktop
+      │ Anthropic-compatible API
+      ▼
+Relay AI gateway
+      │ localhost:8080
+      ▼
+Antigravity Claude Proxy
+      │ Google OAuth
+      ▼
+Google Antigravity / Cloud Code models
+```
+
+ClaudeGravity устанавливает закреплённые и проверенные версии:
+
+- [`antigravity-claude-proxy@2.8.5`](https://www.npmjs.com/package/antigravity-claude-proxy)
+- [`@jacobbd/relay-ai@0.9.0`](https://www.npmjs.com/package/@jacobbd/relay-ai)
+
+Конфигурация Relay AI хранится в `~/.relay-ai`. Установщик сохраняет другие провайдеры и пользовательское избранное, а стандартный набор моделей добавляет только один раз.
+
+## ⌘ Полезные команды
 
 | Действие | Команда |
 |---|---|
-| Привязать ещё один аккаунт Google | `acc accounts add` |
+| Добавить Google-аккаунт | `acc accounts add` |
+| Проверить аккаунты | `acc accounts list` |
+| Проверить прокси | `acc status` |
 | Перезапустить прокси | `acc restart` |
-| Проверить статус прокси | `acc status` |
+| Восстановить Claude после аварийного закрытия | `relay-ai claude-app --restore` |
 
----
+## ? Решение проблем
 
-## ❤️ Использованные проекты
+**После обновления осталась старая ошибка**  
+Повторно выполните установочную команду для своей платформы. Установщики идемпотентны: они обновят запускатели и сохранят аккаунты и настройки.
 
-Сборка работает на основе открытых инструментов:
-- [antigravity-claude-proxy](https://www.npmjs.com/package/antigravity-claude-proxy) — прокси-сервер Google Antigravity (`acc`).
-- [@jacobbd/relay-ai](https://www.npmjs.com/package/@jacobbd/relay-ai) — мост для Claude Desktop (`relay-ai`).
-- [Claude Desktop](https://claude.ai/download) — клиент Anthropic.
+**Claude Desktop не показывает модели**  
+Убедитесь, что включён Developer Mode, выбран режим Code, а окно ClaudeGravity остаётся открытым. Затем полностью перезапустите Claude Desktop.
+
+**Прокси не отвечает**
+
+```bash
+acc restart
+acc status
+```
+
+**Relay AI сообщает о незавершённой сессии**
+
+```bash
+relay-ai claude-app --restore
+```
+
+## Лицензии и ответственность
+
+ClaudeGravity — установочная обвязка над сторонними открытыми инструментами. Claude, Gemini, Google Antigravity и названия моделей являются товарными знаками соответствующих владельцев. Проект предоставляется «как есть» без гарантий доступности моделей, квот или сохранности аккаунта.
