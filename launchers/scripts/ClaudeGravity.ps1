@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $HealthUrl = "http://127.0.0.1:8080/health"
 $NpmUserDir = Join-Path $env:APPDATA "npm"
 $NodeDir = Join-Path $env:ProgramFiles "nodejs"
