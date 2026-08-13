@@ -25,6 +25,12 @@ printf '%s\n' \
   '╰─────────────────────────────────────────╯'
 
 command -v node >/dev/null 2>&1 || fail "Node.js не найден. Запустите установщик заново."
+if command -v npm >/dev/null 2>&1; then
+  printf "\nПроверяю обновления компонентов...\n"
+  if ! npm install -g antigravity-claude-proxy@latest @jacobbd/relay-ai@latest --no-audit --no-fund; then
+    printf "[!] Обновление не удалось; использую установленные версии.\n" >&2
+  fi
+fi
 command -v acc >/dev/null 2>&1 || fail "Antigravity proxy не найден. Запустите установщик заново."
 command -v relay-ai >/dev/null 2>&1 || fail "Relay AI не найден. Запустите установщик заново."
 

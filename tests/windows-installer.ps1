@@ -134,8 +134,9 @@ foreach ($required in @(
   'acc.cmd',
   'relay-ai.cmd',
   '$providerOutput = $providerList -join [Environment]::NewLine',
-  'antigravity-claude-proxy@2.8.5',
-  '@jacobbd/relay-ai@0.9.0'
+  'antigravity-claude-proxy@latest',
+  '@jacobbd/relay-ai@latest',
+  'Проверяю обновления компонентов'
 )) {
   if ((Get-Content -LiteralPath $installerPath -Raw) -notmatch [regex]::Escape($required)) {
     throw "Missing Windows safeguard: $required"

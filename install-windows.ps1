@@ -4,8 +4,8 @@ $InstallDir = Join-Path $env:USERPROFILE "Documents\ClaudeGravity"
 $ScriptsDir = Join-Path $InstallDir "scripts"
 $NpmUserDir = Join-Path $env:APPDATA "npm"
 $NodeDir = Join-Path $env:ProgramFiles "nodejs"
-$ProxyPackage = "antigravity-claude-proxy@2.8.5"
-$RelayPackage = "@jacobbd/relay-ai@0.9.0"
+$ProxyPackage = "antigravity-claude-proxy@latest"
+$RelayPackage = "@jacobbd/relay-ai@latest"
 
 function Say($Message) {
   Write-Host ""
@@ -186,6 +186,16 @@ $claudePs1 = @(
   '  Write-Host "         ClaudeGravity Launcher          "',
   '  Write-Host "========================================="',
   '  Write-Host ""',
+  '',
+  '  $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue',
+  '  if ($npmCommand) {',
+  '    Write-Host "Проверяю обновления компонентов..."',
+  '    & $npmCommand.Source install -g antigravity-claude-proxy@latest @jacobbd/relay-ai@latest --no-audit --no-fund',
+  '    if ($LASTEXITCODE -ne 0) {',
+  '      Write-Host "[!] Обновление не удалось; использую установленные версии." -ForegroundColor Yellow',
+  '    }',
+  '    Write-Host ""',
+  '  }',
   '',
   '  $relayCommand = Get-Command relay-ai.cmd -ErrorAction SilentlyContinue',
   '  $accCommand = Get-Command acc.cmd -ErrorAction SilentlyContinue',

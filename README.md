@@ -95,10 +95,12 @@ Antigravity Claude Proxy
 Google Antigravity / Cloud Code models
 ```
 
-ClaudeGravity устанавливает закреплённые и проверенные версии:
+ClaudeGravity при установке и каждом запуске проверяет npm и автоматически ставит актуальные версии:
 
-- [`antigravity-claude-proxy@2.8.5`](https://www.npmjs.com/package/antigravity-claude-proxy)
-- [`@jacobbd/relay-ai@0.9.0`](https://www.npmjs.com/package/@jacobbd/relay-ai)
+- [`antigravity-claude-proxy`](https://www.npmjs.com/package/antigravity-claude-proxy)
+- [`@jacobbd/relay-ai`](https://www.npmjs.com/package/@jacobbd/relay-ai)
+
+Если проверка обновлений недоступна из-за сети, запуск продолжается с уже установленными версиями.
 
 Конфигурация Relay AI хранится в `~/.relay-ai`. Установщик сохраняет другие провайдеры и пользовательское избранное, а стандартный набор моделей добавляет только один раз.
 

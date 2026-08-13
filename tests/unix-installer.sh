@@ -15,10 +15,13 @@ bash -n \
 node --check "${ROOT}/launchers/scripts/configure-relay.mjs"
 
 for installer in "${ROOT}/install-macos.sh" "${ROOT}/install-linux.sh"; do
-  grep -Fq 'antigravity-claude-proxy@2.8.5' "$installer"
-  grep -Fq '@jacobbd/relay-ai@0.9.0' "$installer"
+  grep -Fq 'antigravity-claude-proxy@latest' "$installer"
+  grep -Fq '@jacobbd/relay-ai@latest' "$installer"
   grep -Fq 'launchers/scripts/configure-relay.mjs' "$installer"
 done
+
+grep -Fq 'npm install -g antigravity-claude-proxy@latest @jacobbd/relay-ai@latest' \
+  "${ROOT}/launchers/scripts/ClaudeGravity.sh"
 
 run_installer() {
   local installer="$1" expected_launcher="$2"

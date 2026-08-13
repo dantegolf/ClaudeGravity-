@@ -130,6 +130,16 @@ function Start-ClaudeGravity {
   Write-Host "========================================="
   Write-Host ""
 
+  $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
+  if ($npmCommand) {
+    Write-Host "Проверяю обновления компонентов..."
+    & $npmCommand.Source install -g antigravity-claude-proxy@latest @jacobbd/relay-ai@latest --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "[!] Обновление не удалось; использую установленные версии." -ForegroundColor Yellow
+    }
+    Write-Host ""
+  }
+
   $relayCommand = Get-Command relay-ai.cmd -ErrorAction SilentlyContinue
   $accCommand = Get-Command acc.cmd -ErrorAction SilentlyContinue
   if (-not $relayCommand -or -not $accCommand) {

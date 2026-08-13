@@ -5,8 +5,8 @@ INSTALL_DIR="${HOME}/Documents/ClaudeGravity"
 SCRIPTS_DIR="${INSTALL_DIR}/scripts"
 NPM_PREFIX="${HOME}/.npm-global"
 RAW_BASE="${CLAUDEGRAVITY_RAW_BASE:-https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main}"
-PROXY_PACKAGE="antigravity-claude-proxy@2.8.5"
-RELAY_PACKAGE="@jacobbd/relay-ai@0.9.0"
+PROXY_PACKAGE="antigravity-claude-proxy@latest"
+RELAY_PACKAGE="@jacobbd/relay-ai@latest"
 
 say() { printf "\n==> %s\n" "$1"; }
 has() { command -v "$1" >/dev/null 2>&1; }
@@ -35,7 +35,7 @@ node -e 'if (Number(process.versions.node.split(".")[0]) < 18) process.exit(1)' 
   exit 1
 }
 
-say "Устанавливаю закреплённые версии прокси и Relay AI..."
+say "Устанавливаю актуальные версии прокси и Relay AI..."
 npm config set prefix "$NPM_PREFIX" >/dev/null
 export PATH="${NPM_PREFIX}/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
 npm install -g "$PROXY_PACKAGE" "$RELAY_PACKAGE"
