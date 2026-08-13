@@ -22,7 +22,7 @@
 ## ✦ Что получится
 
 - Claude Desktop с моделями Google Antigravity вместо отдельного нового клиента.
-- Пять подготовленных моделей в переключателе: Gemini 3.6 Flash High, Gemini 3.1 Pro High, Gemini 2.5 Pro, Claude Sonnet 4.6 и Claude Opus 4.6 Thinking.
+- Пять подготовленных моделей в переключателе: Gemini 3.7 Flash High, Gemini 3.1 Pro High, Gemini 2.5 Pro, Claude Sonnet 4.6 и Claude Opus 4.6 Thinking.
 - Автоматический запуск локального прокси и восстановление повреждённой конфигурации.
 - Привязка Google-аккаунта через браузер; приложение Google Antigravity устанавливать необязательно.
 - Отдельный запускатель для просмотра состояния прокси и лимитов.

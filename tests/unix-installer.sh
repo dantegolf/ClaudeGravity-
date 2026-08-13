@@ -55,7 +55,7 @@ cat > "${TEMP_RELAY_HOME}/providers.json" <<'EOF'
 {"schemaVersion":1,"providers":[{"id":"keep-me","name":"Existing"}]}
 EOF
 cat > "${TEMP_RELAY_HOME}/config.json" <<'EOF'
-{"theme":"dark","favoriteModels":[{"providerId":"keep-me","modelId":"existing"}]}
+{"theme":"dark","claudeGravityFavoritesVersion":1,"favoriteModels":[{"providerId":"keep-me","modelId":"existing"}]}
 EOF
 
 node "${ROOT}/launchers/scripts/configure-relay.mjs" "$TEMP_RELAY_HOME" >/dev/null
@@ -69,11 +69,18 @@ const read = (name) => JSON.parse(readFileSync(join(home, name), "utf8"));
 const registry = read("providers.json");
 const provider = registry.providers.find((entry) => entry.id === "custom-antigravity");
 if (!registry.providers.some((entry) => entry.id === "keep-me")) throw new Error("Existing provider was removed");
-if (provider?.modelsCache?.models?.length !== 19) throw new Error("Expected 19 Antigravity models");
+if (provider?.modelsCache?.models?.length !== 22) throw new Error("Expected 22 Antigravity models");
+for (const id of ["gemini-3.7-flash-low", "gemini-3.7-flash-medium", "gemini-3.7-flash-high"]) {
+  if (!provider.modelsCache.models.some((model) => model.id === id)) throw new Error(`Missing ${id}`);
+}
 
 const config = read("config.json");
 if (config.theme !== "dark") throw new Error("Existing preference was removed");
 if (config.favoriteModels.length !== 6) throw new Error("Expected existing favorite plus five defaults");
+if (config.claudeGravityFavoritesVersion !== 2) throw new Error("Expected favorites preset version 2");
+if (!config.favoriteModels.some((favorite) => favorite.modelId === "gemini-3.7-flash-high")) {
+  throw new Error("Expected Gemini 3.7 Flash High in default favorites");
+}
 
 config.favoriteModels = config.favoriteModels.filter((favorite) => favorite.modelId !== "gemini-2.5-pro");
 writeFileSync(join(home, "config.json"), JSON.stringify(config));

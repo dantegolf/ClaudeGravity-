@@ -25,18 +25,21 @@ const modelIds = [
   "gemini-3.6-flash-low",
   "gemini-3.6-flash-medium",
   "gemini-3.6-flash-tiered",
+  "gemini-3.7-flash-low",
+  "gemini-3.7-flash-medium",
+  "gemini-3.7-flash-high",
   "gemini-pro-agent",
 ];
 
 const defaultFavorites = [
-  "gemini-3.6-flash-high",
+  "gemini-3.7-flash-high",
   "gemini-3.1-pro-high",
   "claude-sonnet-4-6",
   "claude-opus-4-6-thinking",
   "gemini-2.5-pro",
 ];
 
-const stamp = "2026-08-11T00:00:00.000Z";
+const stamp = "2026-08-13T00:00:00.000Z";
 const models = modelIds.map((id) => ({
   id,
   name: id,
@@ -105,7 +108,7 @@ writeJson(secretsPath, secrets);
 
 const configPath = join(relayHome, "config.json");
 const preferences = readJson(configPath, {});
-if (preferences.claudeGravityFavoritesVersion !== 1) {
+if (preferences.claudeGravityFavoritesVersion !== 2) {
   const favorites = Array.isArray(preferences.favoriteModels)
     ? preferences.favoriteModels.filter((favorite) => favorite?.providerId && favorite?.modelId)
     : [];
@@ -116,7 +119,7 @@ if (preferences.claudeGravityFavoritesVersion !== 1) {
     }
   }
   preferences.favoriteModels = favorites;
-  preferences.claudeGravityFavoritesVersion = 1;
+  preferences.claudeGravityFavoritesVersion = 2;
   writeJson(configPath, preferences);
 }
 
