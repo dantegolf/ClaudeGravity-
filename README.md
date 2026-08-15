@@ -86,7 +86,7 @@ Linux-установщик поддерживает `apt`, `dnf`, `pacman` и `z
 При первом запуске:
 
 1. Разрешите привязку Google-аккаунта в браузере.
-2. В Claude Desktop включите **Help → Troubleshooting → Enable Developer Mode**.
+2. В Claude Desktop после аутентификации в любой аккаунт (после будет использоваться локальная учетная запись Вашей системы) не забудьте включить **Help → Troubleshooting → Enable Developer Mode**.
 3. Переключитесь в режим **Code**.
 4. Выберите модель в нижнем меню Claude.
 5. Не закрывайте окно ClaudeGravity: в нём работает временный Relay AI gateway.
