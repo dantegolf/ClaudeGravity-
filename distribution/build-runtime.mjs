@@ -47,6 +47,24 @@ run(npmCommand, [
 ]);
 
 const proxyRoot = join(runtimeDir, 'node_modules', manifest.engines.antigravityProxy.package);
+
+// The published 2.7.7 npm tarball uses the then-current Antigravity fallback
+// (1.18.3), while our original fixture used an older fallback value. Normalize
+// only this single well-known declaration before the strict compatibility patch;
+// every other source transformation remains fail-closed in the patcher.
+const versionDetectorPath = join(proxyRoot, 'src', 'utils', 'version-detector.js');
+let versionDetector = await readFile(versionDetectorPath, 'utf8');
+const fallbackPattern = /const FALLBACK_USER_AGENT_VERSION = process\.env\.FALLBACK_ANTIGRAVITY_VERSION \|\| '[^']+';/g;
+const fallbackMatches = versionDetector.match(fallbackPattern) || [];
+if (fallbackMatches.length !== 1) {
+  throw new Error(`Bundled proxy version detector has ${fallbackMatches.length} compatible fallback declarations; expected exactly one.`);
+}
+versionDetector = versionDetector.replace(
+  fallbackPattern,
+  "const FALLBACK_USER_AGENT_VERSION = process.env.FALLBACK_ANTIGRAVITY_VERSION || '2.8.0';"
+);
+await writeFile(versionDetectorPath, versionDetector, 'utf8');
+
 run(process.execPath, [join(root, 'launchers', 'scripts', 'patch-antigravity-proxy.mjs'), proxyRoot]);
 
 const helpers = await readFile(join(proxyRoot, 'src', 'utils', 'helpers.js'), 'utf8');
