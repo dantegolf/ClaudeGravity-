@@ -32,7 +32,21 @@ if ($major -lt 18) { throw "Требуется Node.js 18 или новее." }
 Say "Скачиваю проверенный ClaudeGravity runtime из нашего GitHub Release..."
 $tempZip = Join-Path ([System.IO.Path]::GetTempPath()) "ClaudeGravity-$([guid]::NewGuid()).zip"
 try {
-  Invoke-WebRequest -UseBasicParsing -Uri $BundleUrl -OutFile $tempZip
+  $downloaded = $false
+  $curlCommand = Get-Command curl.exe -ErrorAction SilentlyContinue
+  if ($curlCommand) {
+    & $curlCommand.Source --fail --location --silent --show-error --retry 3 --retry-delay 2 --connect-timeout 15 --output $tempZip $BundleUrl
+    if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $tempZip) -and (Get-Item -LiteralPath $tempZip).Length -gt 0) {
+      $downloaded = $true
+    } else {
+      Say "curl.exe не смог скачать runtime, использую PowerShell fallback..."
+      Remove-Item -LiteralPath $tempZip -Force -ErrorAction SilentlyContinue
+    }
+  }
+  if (-not $downloaded) {
+    Invoke-WebRequest -UseBasicParsing -Uri $BundleUrl -OutFile $tempZip
+  }
+
   if (Test-Path -LiteralPath $InstallDir) {
     Remove-Item -LiteralPath $InstallDir -Recurse -Force
   }

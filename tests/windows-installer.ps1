@@ -29,6 +29,8 @@ Parse-Script $limitsPath | Out-Null
 foreach ($required in @(
   'dantegolf/ClaudeGravity-/releases/latest/download',
   'ClaudeGravity-runtime.zip',
+  'curl.exe',
+  'Invoke-WebRequest',
   'tar.exe',
   'Expand-Archive',
   'node.exe',
@@ -37,6 +39,12 @@ foreach ($required in @(
   if ($installer -notmatch [regex]::Escape($required)) {
     throw "Missing bundled installer safeguard: $required"
   }
+}
+
+$curlIndex = $installer.IndexOf('curl.exe')
+$webRequestIndex = $installer.IndexOf('Invoke-WebRequest')
+if ($curlIndex -lt 0 -or $webRequestIndex -le $curlIndex) {
+  throw 'Windows installer must prefer curl.exe and keep Invoke-WebRequest only as a fallback.'
 }
 
 $tarIndex = $installer.IndexOf('tar.exe')
