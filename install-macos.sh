@@ -2,63 +2,43 @@
 set -euo pipefail
 
 INSTALL_DIR="${HOME}/Documents/ClaudeGravity"
-SCRIPTS_DIR="${INSTALL_DIR}/scripts"
-NPM_PREFIX="${HOME}/.npm-global"
-RAW_BASE="${CLAUDEGRAVITY_RAW_BASE:-https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main}"
-PROXY_PACKAGE="antigravity-claude-proxy@latest"
-RELAY_PACKAGE="@jacobbd/relay-ai@latest"
+RELEASE_BASE="${CLAUDEGRAVITY_RELEASE_BASE:-https://github.com/dantegolf/ClaudeGravity-/releases/latest/download}"
+BUNDLE_URL="${CLAUDEGRAVITY_BUNDLE_URL:-${RELEASE_BASE}/ClaudeGravity-runtime.tar.gz}"
 
-say() { printf "\n==> %s\n" "$1"; }
+say() { printf '\n==> %s\n' "$1"; }
 has() { command -v "$1" >/dev/null 2>&1; }
 
-download() {
-  local source="$1" destination="$2"
-  curl -fsSL "${RAW_BASE}/${source}" -o "${destination}.tmp"
-  mv "${destination}.tmp" "$destination"
-}
+say "Установка ClaudeGravity bundled runtime для macOS"
 
-say "Установка ClaudeGravity для macOS"
-
-if ! has node || ! has npm; then
+if ! has node; then
   if has brew; then
     say "Устанавливаю Node.js через Homebrew..."
     brew install node
   else
-    printf "\nНужен Node.js 18+ и Homebrew. Установите их и повторите команду.\n"
-    printf "https://nodejs.org/ · https://brew.sh/\n"
+    printf 'Требуется Node.js 18+. Установите Node.js/Homebrew и повторите установку.\n' >&2
     exit 1
   fi
 fi
-
 node -e 'if (Number(process.versions.node.split(".")[0]) < 18) process.exit(1)' || {
-  printf "Требуется Node.js 18 или новее.\n"
+  printf 'Требуется Node.js 18 или новее.\n' >&2
   exit 1
 }
+has curl || { printf 'Требуется curl.\n' >&2; exit 1; }
 
-say "Устанавливаю актуальные версии прокси и Relay AI..."
-npm config set prefix "$NPM_PREFIX" >/dev/null
-export PATH="${NPM_PREFIX}/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
-npm install -g "$PROXY_PACKAGE" "$RELAY_PACKAGE"
-
-PATH_LINE='export PATH="$HOME/.npm-global/bin:$PATH"'
-touch "${HOME}/.zshrc"
-grep -Fqx "$PATH_LINE" "${HOME}/.zshrc" || printf "\n%s\n" "$PATH_LINE" >> "${HOME}/.zshrc"
-
-say "Создаю запускатели в ${INSTALL_DIR}..."
-mkdir -p "$SCRIPTS_DIR"
-download "launchers/scripts/ClaudeGravity.sh" "${SCRIPTS_DIR}/ClaudeGravity.sh"
-download "launchers/scripts/Check-Limits.sh" "${SCRIPTS_DIR}/Check-Limits.sh"
-download "launchers/scripts/configure-relay.mjs" "${SCRIPTS_DIR}/configure-relay.mjs"
-download "launchers/scripts/patch-antigravity-proxy.mjs" "${SCRIPTS_DIR}/patch-antigravity-proxy.mjs"
-download "launchers/ClaudeGravity.command" "${INSTALL_DIR}/ClaudeGravity.command"
-download "launchers/Check-Limits.command" "${INSTALL_DIR}/Check-Limits.command"
-
-chmod +x "${INSTALL_DIR}/ClaudeGravity.command" "${INSTALL_DIR}/Check-Limits.command" "${SCRIPTS_DIR}"/*.sh "${SCRIPTS_DIR}"/*.mjs
+say "Скачиваю проверенный ClaudeGravity runtime из нашего GitHub Release..."
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+curl -fsSL "$BUNDLE_URL" -o "$tmp/runtime.tar.gz"
+rm -rf "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR"
+tar -xzf "$tmp/runtime.tar.gz" -C "$INSTALL_DIR"
+chmod +x "$INSTALL_DIR/ClaudeGravity.sh" "$INSTALL_DIR/Check-Limits.sh"
 xattr -dr com.apple.quarantine "$INSTALL_DIR" 2>/dev/null || true
-bash -n "${SCRIPTS_DIR}/ClaudeGravity.sh" "${SCRIPTS_DIR}/Check-Limits.sh"
-node --check "${SCRIPTS_DIR}/configure-relay.mjs"
-node --check "${SCRIPTS_DIR}/patch-antigravity-proxy.mjs"
 
-say "Готово. Запускаю ClaudeGravity..."
+for required in ClaudeGravity.sh runtime scripts manifest.json; do
+  [ -e "$INSTALL_DIR/$required" ] || { printf 'Runtime archive неполон: %s\n' "$required" >&2; exit 1; }
+done
+
+say "Готово: $INSTALL_DIR"
 [ "${CLAUDEGRAVITY_SKIP_LAUNCH:-0}" = "1" ] && exit 0
-exec "${INSTALL_DIR}/ClaudeGravity.command"
+exec "$INSTALL_DIR/ClaudeGravity.sh"
