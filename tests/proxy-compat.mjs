@@ -8,8 +8,30 @@ const root = resolve(import.meta.dirname, "..");
 const patchScript = join(root, "launchers/scripts/patch-antigravity-proxy.mjs");
 const fixture = await mkdtemp(join(tmpdir(), "claudegravity-proxy-"));
 
+const helpersSource = `
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import { config } from '../config.js';
+
+export function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function throttledFetch(url, options) {
+    if (config.requestThrottlingEnabled) {
+        const delayMs = config.requestDelayMs || 200;
+        if (delayMs > 0) {
+            await sleep(delayMs);
+        }
+    }
+    return fetch(url, options);
+}
+`;
+
 const sources = {
   "package.json": '{"name":"antigravity-claude-proxy","version":"2.8.5"}',
+  "src/utils/helpers.js": helpersSource,
   "src/utils/version-detector.js": `const FALLBACK_USER_AGENT_VERSION = process.env.FALLBACK_ANTIGRAVITY_VERSION || '2.0.3';`,
   "src/constants.js": `
 import { generateSmartUserAgent, getClientVersion } from './utils/version-detector.js';
@@ -84,10 +106,11 @@ for (const [name, content] of Object.entries(sources)) {
   await writeFile(path, content, "utf8");
 }
 
-const runPatch = () => spawnSync(process.execPath, [patchScript, fixture], { encoding: "utf8" });
+const runPatch = (rootPath = fixture) => spawnSync(process.execPath, [patchScript, rootPath], { encoding: "utf8" });
 const first = runPatch();
 assert.equal(first.status, 0, first.stderr);
 assert.match(first.stdout, /Applied Antigravity 2\.8 compatibility/);
+assert.match(first.stdout, /Applied ClaudeGravity selective Smart DNS routing/);
 
 const constants = await readFile(join(fixture, "src/constants.js"), "utf8");
 assert.match(constants, /antigravity\/hub\/\$\{version\}/);
@@ -106,8 +129,41 @@ assert.doesNotMatch(converter, /if \(isClaudeModel\).*toolConfig/s);
 const thinking = await readFile(join(fixture, "src/format/thinking-utils.js"), "utf8");
 assert.match(thinking, /gemini-3\.7-flash-medium'\) \? 4000/);
 
+const helpers = await readFile(join(fixture, "src/utils/helpers.js"), "utf8");
+assert.match(helpers, /ClaudeGravity selective Smart DNS v1/);
+assert.match(helpers, /cloudcode-pa\.googleapis\.com/);
+assert.match(helpers, /daily-cloudcode-pa\.googleapis\.com/);
+assert.match(helpers, /CLAUDEGRAVITY_SMART_DNS_SERVERS/);
+assert.match(helpers, /111\.88\.96\.50,111\.88\.96\.51/);
+assert.match(helpers, /undiciFetch\(url, \{ \.\.\.options, dispatcher \}\)/);
+assert.match(helpers, /systemLookup\(hostname, options, callback\)/);
+
 const second = runPatch();
 assert.equal(second.status, 0, second.stderr);
 assert.match(second.stdout, /already applied/);
+assert.match(second.stdout, /selective Smart DNS routing is already applied/);
 
-console.log("Antigravity proxy compatibility checks passed.");
+const nativeFixture = await mkdtemp(join(tmpdir(), "claudegravity-proxy-native-"));
+const nativeSources = {
+  "package.json": '{"name":"antigravity-claude-proxy","version":"3.0.0"}',
+  "src/utils/helpers.js": helpersSource,
+  "src/constants.js": `
+export function getPlatformUserAgent() { return 'antigravity/hub/3.0.0'; }
+export const CLIENT_METADATA = { ideType: 'ANTIGRAVITY' };
+export const ANTIGRAVITY_HEADERS = { 'Content-Type': 'application/json' };`,
+  "src/cloudcode/model-api.js": `const body = { metadata: CLIENT_METADATA };`,
+  "src/cloudcode/request-builder.js": "const payload = { requestId: `agent/${crypto.randomUUID()}` };"
+};
+for (const [name, content] of Object.entries(nativeSources)) {
+  const path = join(nativeFixture, name);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, "utf8");
+}
+const nativeRun = runPatch(nativeFixture);
+assert.equal(nativeRun.status, 0, nativeRun.stderr);
+assert.match(nativeRun.stdout, /already supports the Antigravity 2\.8 protocol/);
+assert.match(nativeRun.stdout, /Applied ClaudeGravity selective Smart DNS routing/);
+const nativeHelpers = await readFile(join(nativeFixture, "src/utils/helpers.js"), "utf8");
+assert.match(nativeHelpers, /ClaudeGravity selective Smart DNS v1/);
+
+console.log("Antigravity proxy compatibility and Smart DNS checks passed.");

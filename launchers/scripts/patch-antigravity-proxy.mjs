@@ -29,10 +29,120 @@ const replaceExact = async (name, before, after, alreadyAppliedMarker = null) =>
   throw new Error(`${name}: expected one compatible source block, found ${occurrences}`);
 };
 
+const SMART_DNS_MARKER = "ClaudeGravity selective Smart DNS v1";
+
+const patchSmartDns = async () => {
+  const name = "src/utils/helpers.js";
+  const source = await load(name);
+  if (source.includes(SMART_DNS_MARKER)) return false;
+
+  const configImport = "import { config } from '../config.js';";
+  const fetchCall = "    return fetch(url, options);";
+  if (source.split(configImport).length - 1 !== 1) {
+    throw new Error(`${name}: expected one config import for Smart DNS patch`);
+  }
+  if (source.split(fetchCall).length - 1 !== 1) {
+    throw new Error(`${name}: expected one throttled fetch call for Smart DNS patch`);
+  }
+
+  const smartDnsRuntime = `
+import { Agent, fetch as undiciFetch } from 'undici';
+import { Resolver, lookup as systemLookup } from 'node:dns';
+
+// ${SMART_DNS_MARKER}
+// Route only Antigravity/Cloud Code API names through the optional Smart DNS
+// resolver. OAuth, accounts.google.com, and every unrelated hostname keep the
+// system resolver. TLS still connects with the original hostname/SNI.
+const CLAUDEGRAVITY_SMART_DNS_HOSTS = new Set([
+    'cloudcode-pa.googleapis.com',
+    'daily-cloudcode-pa.googleapis.com',
+    'generativelanguage.googleapis.com',
+    'antigravity-unleash.goog'
+]);
+const CLAUDEGRAVITY_SMART_DNS_DISABLED = new Set(['0', 'false', 'off', 'disabled']);
+const claudeGravitySmartDnsMode = (process.env.CLAUDEGRAVITY_SMART_DNS || 'auto').trim().toLowerCase();
+const claudeGravitySmartDnsEnabled = !CLAUDEGRAVITY_SMART_DNS_DISABLED.has(claudeGravitySmartDnsMode);
+const claudeGravitySmartDnsServers = (process.env.CLAUDEGRAVITY_SMART_DNS_SERVERS || '111.88.96.50,111.88.96.51')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
+
+let claudeGravitySmartResolver = null;
+if (claudeGravitySmartDnsEnabled && claudeGravitySmartDnsServers.length > 0) {
+    try {
+        claudeGravitySmartResolver = new Resolver();
+        claudeGravitySmartResolver.setServers(claudeGravitySmartDnsServers);
+    } catch {
+        // Invalid/custom resolver configuration must never prevent proxy startup.
+        claudeGravitySmartResolver = null;
+    }
+}
+
+function claudeGravitySmartLookup(hostname, options, callback) {
+    const fallback = () => systemLookup(hostname, options, callback);
+    const normalized = String(hostname || '').toLowerCase();
+    const family = typeof options === 'number' ? options : (options?.family || 0);
+    if (!claudeGravitySmartResolver || family === 6 || !CLAUDEGRAVITY_SMART_DNS_HOSTS.has(normalized)) {
+        fallback();
+        return;
+    }
+
+    claudeGravitySmartResolver.resolve4(hostname, (error, addresses) => {
+        if (error || !Array.isArray(addresses) || addresses.length === 0) {
+            fallback();
+            return;
+        }
+        if (typeof options === 'object' && options?.all) {
+            callback(null, addresses.map(address => ({ address, family: 4 })));
+            return;
+        }
+        callback(null, addresses[0], 4);
+    });
+}
+
+const claudeGravitySmartDnsAgent = new Agent({
+    connect: { lookup: claudeGravitySmartLookup }
+});
+
+function claudeGravitySmartDnsDispatcher(url, options) {
+    if (!claudeGravitySmartResolver || options?.dispatcher) return null;
+    try {
+        const hostname = new URL(url).hostname.toLowerCase();
+        return CLAUDEGRAVITY_SMART_DNS_HOSTS.has(hostname) ? claudeGravitySmartDnsAgent : null;
+    } catch {
+        return null;
+    }
+}
+`;
+
+  let updated = source.replace(configImport, `${configImport}${smartDnsRuntime}`);
+  updated = updated.replace(fetchCall, `    const dispatcher = claudeGravitySmartDnsDispatcher(url, options);
+    return dispatcher
+        ? undiciFetch(url, { ...options, dispatcher })
+        : fetch(url, options);`);
+  files.set(name, updated);
+  changed = true;
+  return true;
+};
+
+const writeChanges = async () => {
+  if (!changed) return;
+  for (const [name, content] of files) {
+    if (name === "package.json") continue;
+    const path = join(proxyRoot, name);
+    const temporaryPath = `${path}.claudegravity.tmp`;
+    const mode = (await stat(path)).mode;
+    await writeFile(temporaryPath, content, "utf8");
+    await chmod(temporaryPath, mode);
+    await rename(temporaryPath, path);
+  }
+};
+
 const packageJson = JSON.parse(await load("package.json"));
 const constants = await load("src/constants.js");
 const requestBuilder = await load("src/cloudcode/request-builder.js");
 const modelApi = await load("src/cloudcode/model-api.js");
+const smartDnsChanged = await patchSmartDns();
 
 const hasNative28Protocol =
   constants.includes("antigravity/hub/") &&
@@ -42,7 +152,11 @@ const hasNative28Protocol =
   requestBuilder.includes("requestId: `agent/");
 
 if (hasNative28Protocol && !constants.includes("ClaudeGravity Antigravity 2.8 compatibility")) {
+  await writeChanges();
   console.log(`antigravity-claude-proxy ${packageJson.version} already supports the Antigravity 2.8 protocol.`);
+  console.log(smartDnsChanged
+    ? "Applied ClaudeGravity selective Smart DNS routing."
+    : "ClaudeGravity selective Smart DNS routing is already applied.");
   process.exit(0);
 }
 
@@ -197,17 +311,12 @@ await replaceExact(
     const requestedBudget = budget || (lower.includes('gemini-3.7-flash-medium') ? 4000 : GEMINI_DEFAULT_THINKING_BUDGET);`
 );
 
-for (const [name, content] of files) {
-  if (!changed) break;
-  if (name === "package.json") continue;
-  const path = join(proxyRoot, name);
-  const temporaryPath = `${path}.claudegravity.tmp`;
-  const mode = (await stat(path)).mode;
-  await writeFile(temporaryPath, content, "utf8");
-  await chmod(temporaryPath, mode);
-  await rename(temporaryPath, path);
-}
+await writeChanges();
 
 console.log(changed
   ? `Applied Antigravity 2.8 compatibility to antigravity-claude-proxy ${packageJson.version}.`
   : `Antigravity 2.8 compatibility is already applied to antigravity-claude-proxy ${packageJson.version}.`);
+
+console.log(smartDnsChanged
+  ? "Applied ClaudeGravity selective Smart DNS routing."
+  : "ClaudeGravity selective Smart DNS routing is already applied.");

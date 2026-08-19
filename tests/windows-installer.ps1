@@ -137,6 +137,8 @@ try {
   Remove-Item -LiteralPath $tempRelayHome -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+$installerContent = [System.Text.Encoding]::UTF8.GetString($installerBytes).TrimStart([char]0xFEFF)
+
 foreach ($required in @(
   'Write-Utf8NoBom',
   'npm.cmd',
@@ -149,7 +151,7 @@ foreach ($required in @(
   'npmRoot',
   'Проверяю обновления компонентов'
 )) {
-  if ((Get-Content -LiteralPath $installerPath -Raw) -notmatch [regex]::Escape($required)) {
+  if ($installerContent -notmatch [regex]::Escape($required)) {
     throw "Missing Windows safeguard: $required"
   }
 }
