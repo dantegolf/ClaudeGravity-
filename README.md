@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Gemini и Claude внутри привычного Claude Desktop.</strong><br>
-  Один установщик, один Google-аккаунт, переключение моделей прямо в интерфейсе.
+  Один установщик, один проверенный runtime, один источник обновлений.
 </p>
 
 <p align="center">
@@ -17,170 +17,173 @@
 </p>
 
 > [!CAUTION]
-> ClaudeGravity использует неофициальный прокси и не связан с Anthropic или Google. Разработчики прокси предупреждают о риске ограничений или блокировки Google-аккаунта. Не используйте основной аккаунт и продолжайте только если принимаете этот риск.
+> ClaudeGravity использует неофициальную интеграцию и не связан с Anthropic или Google. Доступ Google может зависеть от аккаунта, страны, IP/ASN и изменений upstream. Не используйте основной Google-аккаунт, если не принимаете этот риск.
 
 ## ✦ Что получится
 
-- Claude Desktop с моделями Google Antigravity вместо отдельного нового клиента.
-- Пять подготовленных моделей в переключателе: Gemini 3.7 Flash High, Gemini 3.1 Pro High, Gemini 2.5 Pro, Claude Sonnet 4.6 и Claude Opus 4.6 Thinking.
-- Автоматический запуск локального прокси и восстановление повреждённой конфигурации.
-- Привязка Google-аккаунта через браузер; приложение Google Antigravity устанавливать необязательно.
-- Встроенный selective Smart DNS: только Antigravity / Cloud Code API-хосты могут резолвиться через Smart DNS, а OAuth и остальные домены продолжают использовать обычный системный DNS.
-- Отдельный запускатель для просмотра состояния прокси и лимитов.
-- Одинаковая схема работы на Windows, macOS и Linux.
+- Claude Desktop с подготовленными моделями Google Antigravity.
+- Google OAuth через браузер.
+- Локальный Antigravity engine и Relay gateway.
+- Встроенный selective Smart DNS только для Antigravity / Cloud Code API-хостов.
+- OAuth и остальные домены остаются на системном DNS.
+- Один проверенный ClaudeGravity runtime вместо глобальных `npm @latest` компонентов.
+- Одинаковая модель установки на Windows, macOS и Linux.
 
 ## ↓ Установка
 
 ### Перед началом
 
-1. **Установите [Claude Desktop](https://claude.ai/download)** (на Linux используйте официальный Claude Desktop для поддерживаемого дистрибутива).
-2. **Включите режим разработчика (Developer Mode)** в Claude Desktop:
-   - Без режима разработчика Claude Desktop не сможет подключать локальный мост и сторонние модели.
-   - В верхнем меню приложения (в строке меню macOS или в меню окна Windows/Linux) выберите: **Help** ➔ **Troubleshooting** ➔ **Enable Developer Mode**.
-3. **Обычную смену DNS всей системы делать не нужно.** ClaudeGravity по умолчанию включает собственный selective Smart DNS для Antigravity / Cloud Code API и использует `111.88.96.50` и `111.88.96.51` только для целевых API-хостов.
-4. Если Google всё равно возвращает `403 Forbidden`, `User location is not supported` или таймауты, проблема может быть связана с выходным IP/ASN. В таком случае попробуйте другой интернет-канал или VPN. Smart DNS не гарантирует доступ для аккаунтов или IP-адресов, которые Google блокирует отдельно.
-
-> [!IMPORTANT]
-> Команды ниже явно закрепляют источник установщика и всех скачиваемых launcher/patch-файлов на этом репозитории: `dantegolf/ClaudeGravity-`.
+1. Установите [Claude Desktop](https://claude.ai/download).
+2. В Claude Desktop включите **Help → Troubleshooting → Enable Developer Mode**.
+3. Обычную смену DNS всей системы делать не нужно: selective Smart DNS встроен в ClaudeGravity.
+4. Требуется Node.js 18+. Если его нет, Windows/Linux installer попробует поставить его штатным менеджером пакетов; на macOS используется Homebrew, если он доступен.
 
 ### Windows
 
-Откройте обычный **Windows PowerShell** и выполните:
+Откройте обычный **Windows PowerShell**:
 
 ```powershell
-$env:CLAUDEGRAVITY_RAW_BASE='https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main'; irm "$env:CLAUDEGRAVITY_RAW_BASE/install-windows.ps1" | iex
+irm https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-windows.ps1 | iex
 ```
 
 ### macOS
 
-Откройте **Терминал** и выполните:
-
 ```bash
-CLAUDEGRAVITY_RAW_BASE="https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main" /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-macos.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-macos.sh)"
 ```
 
 ### Linux
 
-Откройте терминал и выполните:
-
 ```bash
-CLAUDEGRAVITY_RAW_BASE="https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main" bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-linux.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-linux.sh)"
 ```
 
-Linux-установщик поддерживает `apt`, `dnf`, `pacman` и `zypper`. При необходимости он попросит `sudo` только для установки Node.js, npm и curl; сами компоненты ClaudeGravity устанавливаются в профиль пользователя.
+Установщики больше не скачивают proxy/Relay из npm на машине пользователя. Они получают готовый `ClaudeGravity-runtime` только из GitHub Releases этого репозитория.
+
+> [!IMPORTANT]
+> Для новой bundled-схемы в Releases должен существовать `ClaudeGravity-runtime.zip` и `ClaudeGravity-runtime.tar.gz`. Эти файлы автоматически создаются workflow `Distribution` при публикации тега `v*`.
 
 ## ◉ Первый запуск
 
-Установщик создаёт два запускаемых файла:
+Установщик создаёт:
 
 | Платформа | Основной запуск | Проверка лимитов |
 |---|---|---|
 | Windows | `Документы\ClaudeGravity\ClaudeGravity.cmd` | `Check-Limits.cmd` |
-| macOS | `Документы/ClaudeGravity/ClaudeGravity.command` | `Check-Limits.command` |
-| Linux | `~/ClaudeGravity/ClaudeGravity.sh` и пункт меню приложений | `Check-Limits.sh` |
+| macOS | `Документы/ClaudeGravity/ClaudeGravity.sh` | `Check-Limits.sh` |
+| Linux | `~/ClaudeGravity/ClaudeGravity.sh` | `Check-Limits.sh` |
 
 При первом запуске:
 
-1. Разрешите привязку Google-аккаунта в браузере.
-2. В Claude Desktop после аутентификации в любой аккаунт не забудьте включить **Help → Troubleshooting → Enable Developer Mode**.
-3. Переключитесь в режим **Code**.
-4. Выберите модель в нижнем меню Claude.
-5. Не закрывайте окно ClaudeGravity: в нём работает временный Relay AI gateway.
+1. ClaudeGravity проверяет целостность bundled runtime и наш compatibility patch.
+2. Если Google-аккаунт ещё не добавлен, откроется OAuth-привязка.
+3. Запускается локальный Antigravity engine.
+4. Relay AI подключает его к Claude Desktop.
+5. В Claude Desktop выберите режим **Code** и нужную модель.
 
 ## ⟳ Как это работает
 
 ```text
-Claude Desktop
-      │ Anthropic-compatible API
-      ▼
-Relay AI gateway
-      │ localhost:8080
-      ▼
-Antigravity Claude Proxy
-      │
-      ├── OAuth / accounts.google.com ─────────→ системный DNS
-      │
-      └── Antigravity / Cloud Code API ───────→ selective Smart DNS
-                         │                       111.88.96.50 / 111.88.96.51
-                         ▼
-              Google Antigravity / Cloud Code models
+                    GitHub Actions (только сборка)
+                              │
+                 pinned upstream versions
+                 proxy 2.7.7 · relay 0.9.5
+                              │
+                              ▼
+                    ClaudeGravity patch
+               compatibility + Smart DNS
+                              │
+                              ▼
+                  ClaudeGravity Release
+             runtime.zip / runtime.tar.gz
+                              │
+                 пользователь скачивает
+                    только наш Release
+                              │
+                              ▼
+Claude Desktop → bundled Relay → bundled Antigravity engine → Google APIs
+                                      │
+                                      ├─ OAuth → system DNS
+                                      └─ Cloud Code → selective Smart DNS
 ```
 
-ClaudeGravity при установке и каждом запуске проверяет npm и автоматически ставит актуальные версии:
+### Почему runtime теперь bundled
 
-- [`antigravity-claude-proxy`](https://www.npmjs.com/package/antigravity-claude-proxy)
-- [`@jacobbd/relay-ai`](https://www.npmjs.com/package/@jacobbd/relay-ai)
+Раньше launcher выполнял `npm install -g ...@latest`, поэтому новая upstream-версия могла приехать пользователю раньше, чем ClaudeGravity успевал проверить совместимость.
 
-Если проверка обновлений недоступна из-за сети, запуск продолжается с уже установленными версиями.
+Теперь версии движков закреплены в `distribution/manifest.json`. CI собирает их заранее, применяет наш patch, запускает тесты и только затем публикует готовый bundle в Releases. Пользовательская машина больше не зависит от npm-версий proxy/Relay во время установки или запуска.
 
-После обновления ClaudeGravity автоматически применяет проверяемый compatibility patch для протокола Antigravity 2.8. Он синхронизирует hub User-Agent, metadata и формат запросов Gemini 3.7. Если структура новой версии proxy неизвестна, запуск останавливается с понятной ошибкой вместо небезопасной правки неподходящих файлов.
+Текущие pins:
 
-Тот же patch добавляет selective Smart DNS в сетевой слой proxy. По умолчанию через Smart DNS резолвятся только:
+- `antigravity-claude-proxy` — `2.7.7`
+- `@jacobbd/relay-ai` — `0.9.5`
+
+Конкретное дерево зависимостей каждой сборки сохраняется в `runtime/package-lock.json` внутри release bundle.
+
+### Selective Smart DNS
+
+По умолчанию через Smart DNS резолвятся только:
 
 - `cloudcode-pa.googleapis.com`
 - `daily-cloudcode-pa.googleapis.com`
 - `generativelanguage.googleapis.com`
 - `antigravity-unleash.goog`
 
-OAuth и все остальные хосты остаются на системном DNS. Если Smart DNS не отвечает или задан некорректно, ClaudeGravity автоматически возвращается к системному DNS для запроса.
+По умолчанию используются `111.88.96.50` и `111.88.96.51`. OAuth и все остальные hostname используют системный resolver. Если Smart DNS не отвечает, lookup откатывается на системный DNS.
 
-Конфигурация Relay AI хранится в `~/.relay-ai`. Установщик сохраняет другие провайдеры и пользовательское избранное, а стандартный набор моделей добавляет только один раз.
-
-### Управление Smart DNS
-
-По умолчанию ничего настраивать не нужно.
-
-Отключить selective Smart DNS для текущего запуска:
+Отключить Smart DNS для запуска:
 
 ```text
 CLAUDEGRAVITY_SMART_DNS=off
 ```
 
-Задать собственные DNS-серверы:
+Задать свои resolver'ы:
 
 ```text
 CLAUDEGRAVITY_SMART_DNS_SERVERS=111.88.96.50,111.88.96.51
 ```
 
-Переменные должны быть заданы в окружении **до запуска ClaudeGravity**, чтобы их унаследовал `antigravity-claude-proxy`.
+Переменные должны быть заданы до запуска `ClaudeGravity`.
 
-## ⌘ Полезные команды
+## ⚙ Для разработчиков
 
-| Действие | Команда |
-|---|---|
-| Добавить Google-аккаунт | `acc accounts add` |
-| Проверить аккаунты | `acc accounts list` |
-| Проверить прокси | `acc status` |
-| Перезапустить прокси | `acc restart` |
-| Восстановить Claude после аварийного закрытия | `relay-ai claude-app --restore` |
+### Собрать runtime локально
+
+```bash
+node distribution/build-runtime.mjs
+node tests/distribution.mjs dist/ClaudeGravity
+```
+
+Сборщик:
+
+1. читает точные версии из `distribution/manifest.json`;
+2. устанавливает их только в staging runtime;
+3. применяет `patch-antigravity-proxy.mjs`;
+4. проверяет marker selective Smart DNS;
+5. добавляет launchers, manifest и third-party notices.
+
+### Опубликовать release
+
+Workflow `.github/workflows/distribution.yml` собирает и тестирует runtime на обычных push/PR. При теге `v*` тот же workflow публикует ZIP и tar.gz в GitHub Release.
+
+Upstream используется **только во время нашей сборки**. Конечный пользователь получает proxy, Relay и ClaudeGravity patch одним bundle из `dantegolf/ClaudeGravity-`.
 
 ## ? Решение проблем
 
-**После обновления осталась старая ошибка**  
-Повторно выполните установочную команду для своей платформы. Установщики идемпотентны: они обновят запускатели и сохранят аккаунты и настройки.
+**Installer получает 404 на `ClaudeGravity-runtime`**  
+Для bundled-схемы ещё не опубликован Release asset. Проверьте последний GitHub Release или используйте версию проекта, для которой runtime уже опубликован.
 
 **`User location is not supported for the API use`**  
-Это ответ Google Cloud Code, а не ошибка преобразования ClaudeGravity. Встроенный Smart DNS уже применяется к целевым API-хостам. Если ошибка сохраняется, попробуйте другой выходной IP/ASN или VPN. Поддерживаемая страна сама по себе не гарантирует доступ: сервер может отклонять адреса хостинговых и дата-центровых сетей.
-
-**Хочу проверить работу без Smart DNS**  
-Запустите ClaudeGravity с `CLAUDEGRAVITY_SMART_DNS=off`. Если после этого поведение меняется, проблема, вероятно, связана с маршрутом до Smart DNS или выбранным DNS-сервером.
+Selective Smart DNS уже применяется к целевым API-хостам. Если ошибка сохраняется, Google может отклонять аккаунт или выходной IP/ASN. Попробуйте другой интернет-канал или VPN.
 
 **Claude Desktop не показывает модели**  
-Убедитесь, что включён Developer Mode, выбран режим Code, а окно ClaudeGravity остаётся открытым. Затем полностью перезапустите Claude Desktop.
+Проверьте Developer Mode, режим Code и перезапустите ClaudeGravity/Claude Desktop.
 
-**Прокси не отвечает**
-
-```bash
-acc restart
-acc status
-```
-
-**Relay AI сообщает о незавершённой сессии**
-
-```bash
-relay-ai claude-app --restore
-```
+**Прокси не отвечает**  
+Запустите `ClaudeGravity` повторно. Launcher сам проверяет bundled engine и пытается поднять его заново.
 
 ## Лицензии и ответственность
 
-ClaudeGravity — установочная обвязка над сторонними открытыми инструментами. Claude, Gemini, Google Antigravity и названия моделей являются товарными знаками соответствующих владельцев. Проект предоставляется «как есть» без гарантий доступности моделей, квот или сохранности аккаунта.
+Bundled third-party компоненты сохраняют свои upstream LICENSE-файлы внутри `runtime/node_modules`. Дополнительные сведения находятся в [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+Claude, Gemini, Google Antigravity и названия моделей являются товарными знаками соответствующих владельцев. Проект предоставляется «как есть» без гарантий доступности моделей, квот или сохранности аккаунта.
