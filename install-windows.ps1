@@ -37,7 +37,23 @@ try {
     Remove-Item -LiteralPath $InstallDir -Recurse -Force
   }
   New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-  Expand-Archive -LiteralPath $tempZip -DestinationPath $InstallDir -Force
+
+  Say "Распаковываю runtime..."
+  $extracted = $false
+  $tarCommand = Get-Command tar.exe -ErrorAction SilentlyContinue
+  if ($tarCommand) {
+    & $tarCommand.Source -xf $tempZip -C $InstallDir
+    if ($LASTEXITCODE -eq 0) {
+      $extracted = $true
+    } else {
+      Say "tar.exe не смог распаковать ZIP, использую совместимый fallback..."
+      Remove-Item -LiteralPath $InstallDir -Recurse -Force
+      New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    }
+  }
+  if (-not $extracted) {
+    Expand-Archive -LiteralPath $tempZip -DestinationPath $InstallDir -Force
+  }
 } finally {
   Remove-Item -LiteralPath $tempZip -Force -ErrorAction SilentlyContinue
 }
