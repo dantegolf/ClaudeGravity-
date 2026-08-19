@@ -86,8 +86,8 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-
 ```text
                     GitHub Actions (только сборка)
                               │
-                 pinned upstream versions
-                 proxy 2.7.7 · relay 0.9.5
+                   pinned upstream inputs
+        proxy commit 055699f… · Relay AI 0.9.5
                               │
                               ▼
                     ClaudeGravity patch
@@ -111,12 +111,14 @@ Claude Desktop → bundled Relay → bundled Antigravity engine → Google APIs
 
 Раньше launcher выполнял `npm install -g ...@latest`, поэтому новая upstream-версия могла приехать пользователю раньше, чем ClaudeGravity успевал проверить совместимость.
 
-Теперь версии движков закреплены в `distribution/manifest.json`. CI собирает их заранее, применяет наш patch, запускает тесты и только затем публикует готовый bundle в Releases. Пользовательская машина больше не зависит от npm-версий proxy/Relay во время установки или запуска.
+Теперь upstream inputs закреплены в `distribution/manifest.json`. Proxy фиксируется **полным commit SHA**, а Relay — точной package-версией. CI собирает их заранее, применяет наш patch, запускает тесты и только затем публикует готовый bundle в Releases. Пользовательская машина больше не зависит от npm-версий proxy/Relay во время установки или запуска.
 
 Текущие pins:
 
-- `antigravity-claude-proxy` — `2.7.7`
-- `@jacobbd/relay-ai` — `0.9.5`
+- `antigravity-claude-proxy` — commit `055699fcebcac83cea64bf599546a3ce820ebcdb` (package metadata `2.7.7`);
+- `@jacobbd/relay-ai` — `0.9.5`.
+
+Почему proxy закреплён по SHA: upstream release tags и npm metadata не всегда синхронизированы, поэтому номер версии недостаточен для воспроизводимой сборки. Full commit SHA гарантирует, что ClaudeGravity тестирует и упаковывает ровно тот source tree, который мы выбрали.
 
 Конкретное дерево зависимостей каждой сборки сохраняется в `runtime/package-lock.json` внутри release bundle.
 
@@ -156,11 +158,12 @@ node tests/distribution.mjs dist/ClaudeGravity
 
 Сборщик:
 
-1. читает точные версии из `distribution/manifest.json`;
+1. читает точные inputs из `distribution/manifest.json`;
 2. устанавливает их только в staging runtime;
 3. применяет `patch-antigravity-proxy.mjs`;
 4. проверяет marker selective Smart DNS;
-5. добавляет launchers, manifest и third-party notices.
+5. валидирует pinned source в lockfile;
+6. добавляет launchers, manifest и third-party notices.
 
 ### Опубликовать release
 
