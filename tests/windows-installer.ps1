@@ -29,6 +29,7 @@ Parse-Script $limitsPath | Out-Null
 foreach ($required in @(
   'dantegolf/ClaudeGravity-/releases/latest/download',
   'ClaudeGravity-runtime.zip',
+  'tar.exe',
   'Expand-Archive',
   'node.exe',
   'CLAUDEGRAVITY_BUNDLE_URL'
@@ -36,6 +37,12 @@ foreach ($required in @(
   if ($installer -notmatch [regex]::Escape($required)) {
     throw "Missing bundled installer safeguard: $required"
   }
+}
+
+$tarIndex = $installer.IndexOf('tar.exe')
+$fallbackIndex = $installer.IndexOf('Expand-Archive')
+if ($tarIndex -lt 0 -or $fallbackIndex -le $tarIndex) {
+  throw 'Windows installer must prefer tar.exe and keep Expand-Archive only as a fallback.'
 }
 
 foreach ($forbidden in @('olegsuper338-lgtm', 'npm.cmd', '@latest', 'npm install -g')) {
