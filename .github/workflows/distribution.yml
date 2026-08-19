@@ -1,0 +1,55 @@
+name: Distribution
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate source
+        run: |
+          node --check distribution/build-runtime.mjs
+          node tests/distribution.mjs
+          bash tests/unix-installer.sh
+      - name: Build pinned runtime bundle
+        run: node distribution/build-runtime.mjs
+      - name: Validate built runtime
+        run: node tests/distribution.mjs dist/ClaudeGravity
+      - name: Package tarball
+        run: tar -czf ClaudeGravity-runtime.tar.gz -C dist/ClaudeGravity .
+      - name: Package zip
+        run: (cd dist/ClaudeGravity && zip -qr ../../ClaudeGravity-runtime.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: claudegravity-runtime
+          path: |
+            ClaudeGravity-runtime.tar.gz
+            ClaudeGravity-runtime.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: claudegravity-runtime
+          path: artifacts
+      - name: Publish ClaudeGravity release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" artifacts/* --repo "${GITHUB_REPOSITORY}" --generate-notes

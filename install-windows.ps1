@@ -1,356 +1,53 @@
 $ErrorActionPreference = "Stop"
 
-$InstallDir = Join-Path $env:USERPROFILE "Documents\ClaudeGravity"
-$ScriptsDir = Join-Path $InstallDir "scripts"
-$NpmUserDir = Join-Path $env:APPDATA "npm"
-$NodeDir = Join-Path $env:ProgramFiles "nodejs"
-$ProxyPackage = "antigravity-claude-proxy@latest"
-$RelayPackage = "@jacobbd/relay-ai@latest"
-$RawBase = if ($env:CLAUDEGRAVITY_RAW_BASE) { $env:CLAUDEGRAVITY_RAW_BASE } else { "https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main" }
+$Documents = [Environment]::GetFolderPath("MyDocuments")
+if (-not $Documents) { $Documents = Join-Path $env:USERPROFILE "Documents" }
+$InstallDir = Join-Path $Documents "ClaudeGravity"
+$ReleaseBase = if ($env:CLAUDEGRAVITY_RELEASE_BASE) { $env:CLAUDEGRAVITY_RELEASE_BASE } else { "https://github.com/dantegolf/ClaudeGravity-/releases/latest/download" }
+$BundleUrl = if ($env:CLAUDEGRAVITY_BUNDLE_URL) { $env:CLAUDEGRAVITY_BUNDLE_URL } else { "$ReleaseBase/ClaudeGravity-runtime.zip" }
 
 function Say($Message) {
   Write-Host ""
   Write-Host "==> $Message"
 }
 
-Say "Установка ClaudeGravity для Windows"
+Say "Установка ClaudeGravity bundled runtime"
 
-if (-not (Get-Command node.exe -ErrorAction SilentlyContinue) -or -not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
-  if (Get-Command winget -ErrorAction SilentlyContinue) {
+$nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
+if (-not $nodeCommand) {
+  if (Get-Command winget.exe -ErrorAction SilentlyContinue) {
     Say "Устанавливаю Node.js LTS..."
     winget install --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements
-    if ($LASTEXITCODE -ne 0) {
-      throw "Не удалось установить Node.js через winget (код $LASTEXITCODE)."
-    }
-    $env:Path = "$NpmUserDir;$NodeDir;$env:Path"
-  } else {
-    Write-Host "Требуется Node.js. Установите Node.js LTS и запустите снова:"
-    Write-Host "https://nodejs.org/"
-    exit 1
+    if ($LASTEXITCODE -ne 0) { throw "Не удалось установить Node.js через winget." }
+    $env:Path = "$env:ProgramFiles\nodejs;$env:Path"
+    $nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
+  }
+}
+if (-not $nodeCommand) {
+  throw "Требуется Node.js 18+. Установите Node.js и повторите установку."
+}
+$major = [int]((& $nodeCommand.Source -p "process.versions.node.split('.')[0]").Trim())
+if ($major -lt 18) { throw "Требуется Node.js 18 или новее." }
+
+Say "Скачиваю проверенный ClaudeGravity runtime из нашего GitHub Release..."
+$tempZip = Join-Path ([System.IO.Path]::GetTempPath()) "ClaudeGravity-$([guid]::NewGuid()).zip"
+try {
+  Invoke-WebRequest -UseBasicParsing -Uri $BundleUrl -OutFile $tempZip
+  if (Test-Path -LiteralPath $InstallDir) {
+    Remove-Item -LiteralPath $InstallDir -Recurse -Force
+  }
+  New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+  Expand-Archive -LiteralPath $tempZip -DestinationPath $InstallDir -Force
+} finally {
+  Remove-Item -LiteralPath $tempZip -Force -ErrorAction SilentlyContinue
+}
+
+foreach ($required in @("ClaudeGravity.cmd", "ClaudeGravity.ps1", "runtime", "scripts", "manifest.json")) {
+  if (-not (Test-Path -LiteralPath (Join-Path $InstallDir $required))) {
+    throw "Runtime archive повреждён или неполон: отсутствует $required"
   }
 }
 
-Say "Настройка пути npm..."
-$currentUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($currentUserPath -notlike "*$NpmUserDir*") {
-  [Environment]::SetEnvironmentVariable("Path", "$currentUserPath;$NpmUserDir", "User")
-}
-$env:Path = "$NpmUserDir;$NodeDir;$env:Path"
-
-Say "Установка компонентов прокси и реле..."
-$npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
-if (-not $npmCommand) {
-  throw "npm.cmd не найден после установки Node.js. Перезапустите PowerShell и установщик."
-}
-& $npmCommand.Source install -g $ProxyPackage $RelayPackage
-if ($LASTEXITCODE -ne 0) {
-  throw "npm не смог установить компоненты ClaudeGravity (код $LASTEXITCODE)."
-}
-
-$env:Path = "$NpmUserDir;$NodeDir;$env:Path"
-if (-not (Get-Command acc.cmd -ErrorAction SilentlyContinue) -or -not (Get-Command relay-ai.cmd -ErrorAction SilentlyContinue)) {
-  throw "Компоненты установлены, но команды acc.cmd или relay-ai.cmd не найдены."
-}
-
-Say "Создаю ярлыки в $InstallDir..."
-New-Item -ItemType Directory -Force -Path $ScriptsDir | Out-Null
-$patchScriptPath = Join-Path $ScriptsDir "patch-antigravity-proxy.mjs"
-Invoke-WebRequest -UseBasicParsing "$RawBase/launchers/scripts/patch-antigravity-proxy.mjs" -OutFile $patchScriptPath
-& node.exe --check $patchScriptPath
-if ($LASTEXITCODE -ne 0) {
-  throw "Загруженный compatibility patch содержит синтаксическую ошибку."
-}
-
-$claudePs1 = @(
-  '$ErrorActionPreference = "Stop"',
-  '$HealthUrl = "http://127.0.0.1:8080/health"',
-  '$NpmUserDir = Join-Path $env:APPDATA "npm"',
-  '$NodeDir = Join-Path $env:ProgramFiles "nodejs"',
-  '$env:Path = "$NpmUserDir;$NodeDir;$env:Path"',
-  '',
-  '$env:RELAY_AI_HOME = Join-Path $env:USERPROFILE ".relay-ai"',
-  '$env:ANTIGRAVITY_API_KEY = "antigravity"',
-  '$env:RELAY_AI_KEY_CUSTOM_ANTIGRAVITY = "antigravity"',
-  '',
-  'function Write-Utf8NoBom($Path, $Content) {',
-  '  $encoding = New-Object System.Text.UTF8Encoding($false)',
-  '  [System.IO.File]::WriteAllText($Path, $Content, $encoding)',
-  '}',
-  '',
-  'function Test-Proxy {',
-  '  try {',
-  '    Invoke-RestMethod $HealthUrl -TimeoutSec 2 | Out-Null',
-  '    return $true',
-  '  } catch {',
-  '    return $false',
-  '  }',
-  '}',
-  '',
-  'function Ensure-RelayProvider {',
-  '  $relayDir = $env:RELAY_AI_HOME',
-  '  $providersJsonPath = Join-Path $relayDir "providers.json"',
-  '  $secretsJsonPath = Join-Path $relayDir "secrets.json"',
-  '',
-  '  if (-not (Test-Path -LiteralPath $relayDir)) {',
-  '    New-Item -ItemType Directory -Force -Path $relayDir | Out-Null',
-  '  }',
-  '',
-  '  $needsSecrets = $true',
-  '  if (Test-Path -LiteralPath $secretsJsonPath) {',
-  '    try {',
-  '      $secContent = Get-Content -LiteralPath $secretsJsonPath -Raw',
-  '      $secContent | ConvertFrom-Json | Out-Null',
-  '      if ($secContent -match "provider:custom-antigravity") {',
-  '        $needsSecrets = $false',
-  '      }',
-  '    } catch {',
-  '      $needsSecrets = $true',
-  '    }',
-  '  }',
-  '',
-  '  if ($needsSecrets) {',
-  '    $secJson = ''{"version":1,"accounts":{"provider:custom-antigravity":"antigravity"}}''',
-  '    Write-Utf8NoBom $secretsJsonPath $secJson',
-  '  } else {',
-  '    Write-Utf8NoBom $secretsJsonPath $secContent',
-  '  }',
-  '',
-  '  $needsConfig = $true',
-  '  if (Test-Path -LiteralPath $providersJsonPath) {',
-  '    try {',
-  '      $content = Get-Content -LiteralPath $providersJsonPath -Raw',
-  '      $config = $content | ConvertFrom-Json',
-  '      $provider = @($config.providers | Where-Object { $_.id -eq "custom-antigravity" })[0]',
-  '      $modelIds = @($provider.modelsCache.models | ForEach-Object { $_.id })',
-  '      if ($provider -and',
-  '          $provider.templateId -eq "custom-anthropic" -and',
-  '          $provider.name -eq "Antigravity" -and',
-  '          $provider.enabled -eq $true -and',
-  '          $provider.authRef -eq "keyring:provider:custom-antigravity" -and',
-  '          $provider.addedAt -and',
-  '          $provider.api.url -eq "http://127.0.0.1:8080" -and',
-  '          $modelIds.Count -eq 22 -and',
-  '          $modelIds -contains "gemini-3.7-flash-low" -and',
-  '          $modelIds -contains "gemini-3.7-flash-medium" -and',
-  '          $modelIds -contains "gemini-3.7-flash-high") {',
-  '        $needsConfig = $false',
-  '      }',
-  '    } catch {',
-  '      $needsConfig = $true',
-  '    }',
-  '  }',
-  '',
-  '  if ($needsConfig) {',
-  '    $jsonContent = ''{"schemaVersion":1,"providers":[{"id":"custom-antigravity","templateId":"custom-anthropic","name":"Antigravity","enabled":true,"authRef":"keyring:provider:custom-antigravity","addedAt":"2026-08-11T00:00:00.000Z","refreshedAt":"2026-08-11T00:00:00.000Z","api":{"npm":"@ai-sdk/anthropic","url":"http://127.0.0.1:8080"},"modelsCache":{"fetchedAt":"2026-08-11T00:00:00.000Z","models":[{"id":"gemini-3.6-flash-high","name":"gemini-3.6-flash-high","upstreamModelId":"gemini-3.6-flash-high","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"claude-sonnet-4-6","name":"claude-sonnet-4-6","upstreamModelId":"claude-sonnet-4-6","family":"claude","brand":"Claude","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-2.5-pro","name":"gemini-2.5-pro","upstreamModelId":"gemini-2.5-pro","family":"gemini","brand":"Gemini","contextWindow":2000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"claude-opus-4-6-thinking","name":"claude-opus-4-6-thinking","upstreamModelId":"claude-opus-4-6-thinking","family":"claude","brand":"Claude","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-2.5-flash","name":"gemini-2.5-flash","upstreamModelId":"gemini-2.5-flash","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-2.5-flash-lite","name":"gemini-2.5-flash-lite","upstreamModelId":"gemini-2.5-flash-lite","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-2.5-flash-thinking","name":"gemini-2.5-flash-thinking","upstreamModelId":"gemini-2.5-flash-thinking","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3-flash","name":"gemini-3-flash","upstreamModelId":"gemini-3-flash","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3-flash-agent","name":"gemini-3-flash-agent","upstreamModelId":"gemini-3-flash-agent","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.1-flash-image","name":"gemini-3.1-flash-image","upstreamModelId":"gemini-3.1-flash-image","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.1-flash-lite","name":"gemini-3.1-flash-lite","upstreamModelId":"gemini-3.1-flash-lite","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.1-pro-high","name":"gemini-3.1-pro-high","upstreamModelId":"gemini-3.1-pro-high","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.1-pro-low","name":"gemini-3.1-pro-low","upstreamModelId":"gemini-3.1-pro-low","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.5-flash-extra-low","name":"gemini-3.5-flash-extra-low","upstreamModelId":"gemini-3.5-flash-extra-low","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.5-flash-low","name":"gemini-3.5-flash-low","upstreamModelId":"gemini-3.5-flash-low","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.6-flash-low","name":"gemini-3.6-flash-low","upstreamModelId":"gemini-3.6-flash-low","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.6-flash-medium","name":"gemini-3.6-flash-medium","upstreamModelId":"gemini-3.6-flash-medium","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-3.6-flash-tiered","name":"gemini-3.6-flash-tiered","upstreamModelId":"gemini-3.6-flash-tiered","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"},{"id":"gemini-pro-agent","name":"gemini-pro-agent","upstreamModelId":"gemini-pro-agent","family":"gemini","brand":"Gemini","contextWindow":1000000,"modelFormat":"anthropic","npm":"@ai-sdk/anthropic","apiUrl":"http://127.0.0.1:8080"}]}}]}''',
-  '    $jsonConfig = $jsonContent | ConvertFrom-Json',
-  '    foreach ($modelId in @("gemini-3.7-flash-low", "gemini-3.7-flash-medium", "gemini-3.7-flash-high")) {',
-  '      $jsonConfig.providers[0].modelsCache.models += [pscustomobject]@{',
-  '        id = $modelId',
-  '        name = $modelId',
-  '        upstreamModelId = $modelId',
-  '        family = "gemini"',
-  '        brand = "Gemini"',
-  '        contextWindow = 1000000',
-  '        modelFormat = "anthropic"',
-  '        npm = "@ai-sdk/anthropic"',
-  '        apiUrl = "http://127.0.0.1:8080"',
-  '      }',
-  '    }',
-  '    Write-Utf8NoBom $providersJsonPath ($jsonConfig | ConvertTo-Json -Depth 20)',
-  '  } else {',
-  '    Write-Utf8NoBom $providersJsonPath $content',
-  '  }',
-  '',
-  '  $configJsonPath = Join-Path $relayDir "config.json"',
-  '  try {',
-  '    if (Test-Path -LiteralPath $configJsonPath) {',
-  '      $preferences = Get-Content -LiteralPath $configJsonPath -Raw | ConvertFrom-Json',
-  '    } else {',
-  '      $preferences = New-Object PSObject',
-  '    }',
-  '  } catch {',
-  '    $preferences = New-Object PSObject',
-  '  }',
-  '',
-  '  if ($preferences.claudeGravityFavoritesVersion -ne 2) {',
-  '    $favorites = @($preferences.favoriteModels | Where-Object { $_.providerId -and $_.modelId })',
-  '    $defaultModels = @(',
-  '      "gemini-3.7-flash-high",',
-  '      "gemini-3.1-pro-high",',
-  '      "claude-sonnet-4-6",',
-  '      "claude-opus-4-6-thinking",',
-  '      "gemini-2.5-pro"',
-  '    )',
-  '    foreach ($modelId in $defaultModels) {',
-  '      $exists = @($favorites | Where-Object {',
-  '        $_.providerId -eq "custom-antigravity" -and $_.modelId -eq $modelId',
-  '      }).Count -gt 0',
-  '      if (-not $exists -and $favorites.Count -lt 20) {',
-  '        $favorites += [pscustomobject]@{',
-  '          providerId = "custom-antigravity"',
-  '          modelId = $modelId',
-  '        }',
-  '      }',
-  '    }',
-  '    $preferences | Add-Member -NotePropertyName "favoriteModels" -NotePropertyValue @($favorites) -Force',
-  '    $preferences | Add-Member -NotePropertyName "claudeGravityFavoritesVersion" -NotePropertyValue 2 -Force',
-  '    Write-Utf8NoBom $configJsonPath ($preferences | ConvertTo-Json -Depth 20)',
-  '  }',
-  '}',
-  '',
-  'function Pause-End {',
-  '  Write-Host ""',
-  '  Write-Host "Нажмите любую клавишу для закрытия..."',
-  '  [Console]::ReadKey($true) | Out-Null',
-  '}',
-  '',
-  'function Start-ClaudeGravity {',
-  '  Clear-Host',
-  '  Write-Host "========================================="',
-  '  Write-Host "         ClaudeGravity Launcher          "',
-  '  Write-Host "========================================="',
-  '  Write-Host ""',
-  '',
-  '  $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue',
-  '  if ($npmCommand) {',
-  '    Write-Host "Проверяю обновления компонентов..."',
-  '    & $npmCommand.Source install -g antigravity-claude-proxy@latest @jacobbd/relay-ai@latest --no-audit --no-fund',
-  '    if ($LASTEXITCODE -ne 0) {',
-  '      Write-Host "[!] Обновление не удалось; использую установленные версии." -ForegroundColor Yellow',
-  '    }',
-  '    $npmRoot = (& $npmCommand.Source root -g | Select-Object -Last 1).Trim()',
-  '    $proxyRoot = Join-Path $npmRoot "antigravity-claude-proxy"',
-  '    & node.exe (Join-Path $PSScriptRoot "patch-antigravity-proxy.mjs") $proxyRoot',
-  '    if ($LASTEXITCODE -ne 0) {',
-  '      throw "Установленный Antigravity proxy несовместим с протоколом 2.8. Переустановите ClaudeGravity или обновите compatibility patch."',
-  '    }',
-  '    Write-Host ""',
-  '  }',
-  '',
-  '  $relayCommand = Get-Command relay-ai.cmd -ErrorAction SilentlyContinue',
-  '  $accCommand = Get-Command acc.cmd -ErrorAction SilentlyContinue',
-  '  if (-not $relayCommand -or -not $accCommand) {',
-  '    throw "Компоненты ClaudeGravity не найдены. Запустите установщик заново."',
-  '  }',
-  '',
-  '  # Запущенный Node-процесс продолжает использовать модули до обновления.',
-  '  & $accCommand.Source stop | Out-Null',
-  '',
-  '  # 1. Проверяем регистрацию провайдера Antigravity в relay-ai',
-  '  Ensure-RelayProvider',
-  '  $providerList = & $relayCommand.Source providers list 2>&1',
-  '  $providerOutput = $providerList -join [Environment]::NewLine',
-  '  if ($providerOutput -notmatch "custom-antigravity") {',
-  '    $details = $providerOutput.Trim()',
-  '    if (-not $details) {',
-  '      $details = "relay-ai завершился с кодом $LASTEXITCODE."',
-  '    }',
-  '    throw "Relay AI не смог прочитать конфигурацию Antigravity.`n$details"',
-  '  }',
-  '',
-  '  # 2. Проверяем привязанные аккаунты Google',
-  '  $accList = & $accCommand.Source accounts list 2>$null',
-  '  if ($LASTEXITCODE -ne 0) {',
-  '    throw "Не удалось проверить аккаунты Google."',
-  '  }',
-  '  $hasAccount = $accList -match "([1-9][0-9]*) account\(s\)"',
-  '',
-  '  if (-not $hasAccount) {',
-  '    Write-Host "[!] Не найдено привязанных аккаунтов Google (Google AI / Antigravity)."',
-  '    $reply = Read-Host "Привязать аккаунт Google прямо сейчас? [Y/n]"',
-  '    if ($reply -eq "" -or $reply -match "^[Yy]") {',
-  '      Write-Host "Останавливаю прокси перед привязкой..."',
-  '      & $accCommand.Source stop | Out-Null',
-  '      & $accCommand.Source accounts add',
-  '      if ($LASTEXITCODE -ne 0) {',
-  '        throw "Не удалось привязать аккаунт Google."',
-  '      }',
-  '    } else {',
-  '      throw "Для запуска необходимо привязать аккаунт Google."',
-  '    }',
-  '  }',
-  '',
-  '  # 3. Проверяем и запускаем прокси',
-  '  if (-not (Test-Proxy)) {',
-  '    Write-Host ""',
-  '    Write-Host "Запускаю Antigravity proxy..."',
-  '    & $accCommand.Source start',
-  '    if ($LASTEXITCODE -ne 0) {',
-  '      throw "Не удалось запустить Antigravity proxy."',
-  '    }',
-  '',
-  '    $proxyReady = $false',
-  '    for ($attempt = 0; $attempt -lt 10; $attempt++) {',
-  '      if (Test-Proxy) {',
-  '        $proxyReady = $true',
-  '        break',
-  '      }',
-  '      Start-Sleep -Seconds 1',
-  '    }',
-  '    if (-not $proxyReady) {',
-  '      throw "Прокси не ответил на $HealthUrl."',
-  '    }',
-  '  }',
-  '',
-  '  Write-Host "[✓] Прокси и конфигурация Antigravity готовы."',
-  '',
-  '  Write-Host ""',
-  '  Write-Host "[✓] Запускаю выбор модели и Claude Desktop..."',
-  '  Write-Host ""',
-  '  Write-Host "Напоминание для Claude Desktop:"',
-  '  Write-Host " 1. Меню Help -> Troubleshooting -> Enable Developer Mode"',
-  '  Write-Host " 2. Переключите режим на: Code"',
-  '  Write-Host ""',
-  '',
-  '  & $relayCommand.Source claude-app',
-  '  if ($LASTEXITCODE -ne 0) {',
-  '    throw "Relay AI завершился с ошибкой."',
-  '  }',
-  '}',
-  '',
-  'try {',
-  '  Start-ClaudeGravity',
-  '  Pause-End',
-  '} catch {',
-  '  Write-Host ""',
-  '  Write-Host "Ошибка: $($_.Exception.Message)" -ForegroundColor Red',
-  '  Pause-End',
-  '  exit 1',
-  '}'
-)
-$claudePs1 | Set-Content -Encoding UTF8 (Join-Path $ScriptsDir "ClaudeGravity.ps1")
-
-$claudeCmd = @(
-  '@echo off',
-  'powershell -ExecutionPolicy Bypass -File "%~dp0scripts\ClaudeGravity.ps1"'
-)
-$claudeCmd | Set-Content -Encoding ASCII (Join-Path $InstallDir "ClaudeGravity.cmd")
-
-$limitsPs1 = @(
-  '$ErrorActionPreference = "Continue"',
-  'Clear-Host',
-  'Write-Host "=== Лимиты ClaudeGravity ==="',
-  'Write-Host ""',
-  '',
-  'try {',
-  '  Invoke-RestMethod http://127.0.0.1:8080/health | ConvertTo-Json -Depth 20',
-  '} catch {',
-  '  Write-Host "Прокси не ответил на http://127.0.0.1:8080/health"',
-  '  Write-Host $_.Exception.Message',
-  '}',
-  '',
-  'Write-Host ""',
-  'Write-Host "Нажмите любую клавишу для закрытия..."',
-  '[Console]::ReadKey($true) | Out-Null'
-)
-$limitsPs1 | Set-Content -Encoding UTF8 (Join-Path $ScriptsDir "Check-Limits.ps1")
-
-$limitsCmd = @(
-  '@echo off',
-  'powershell -ExecutionPolicy Bypass -File "%~dp0scripts\Check-Limits.ps1"'
-)
-$limitsCmd | Set-Content -Encoding ASCII (Join-Path $InstallDir "Check-Limits.cmd")
-
-Say "Файлы установлены. Проверяю запуск..."
-
-& (Join-Path $ScriptsDir "ClaudeGravity.ps1")
+Say "Готово: $InstallDir"
+if ($env:CLAUDEGRAVITY_SKIP_LAUNCH -eq "1") { exit 0 }
+& (Join-Path $InstallDir "ClaudeGravity.cmd")
