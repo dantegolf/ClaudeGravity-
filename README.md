@@ -25,6 +25,7 @@
 - Пять подготовленных моделей в переключателе: Gemini 3.7 Flash High, Gemini 3.1 Pro High, Gemini 2.5 Pro, Claude Sonnet 4.6 и Claude Opus 4.6 Thinking.
 - Автоматический запуск локального прокси и восстановление повреждённой конфигурации.
 - Привязка Google-аккаунта через браузер; приложение Google Antigravity устанавливать необязательно.
+- Встроенный selective Smart DNS: только Antigravity / Cloud Code API-хосты могут резолвиться через Smart DNS, а OAuth и остальные домены продолжают использовать обычный системный DNS.
 - Отдельный запускатель для просмотра состояния прокси и лимитов.
 - Одинаковая схема работы на Windows, macOS и Linux.
 
@@ -36,23 +37,18 @@
 2. **Включите режим разработчика (Developer Mode)** в Claude Desktop:
    - Без режима разработчика Claude Desktop не сможет подключать локальный мост и сторонние модели.
    - В верхнем меню приложения (в строке меню macOS или в меню окна Windows/Linux) выберите: **Help** ➔ **Troubleshooting** ➔ **Enable Developer Mode**.
-3. **Сетевые ограничения, блокировки IP со стороны Google и рекомендации:**
-   - По недавним новостям Google начал активно блокировать и фильтровать IP-адреса многих хостингов, дата-центров и определённых провайдеров (возникают ошибки авторизации `403 Forbidden`, `User location is not supported` или таймауты).
-   - **Как решить проблемы с подключением:**
-     - **Качественный VPN**: включайте VPN перед запуском. Рекомендуются локации в США (US) или Западной Европе. При возникновении ошибок смените сервер или протокол.
-     - **Смена DNS**: многие сетевые сбои и блокировки устраняются сменой DNS на уровне системы или роутера:
-       - **[Xbox DNS](https://xbox-dns.ru/)** (популярный Smart DNS для стабильного доступа к сервисам и API без потери скорости):
-         - Основной DNS: `111.88.96.50`
-         - Дополнительный DNS: `111.88.96.51`
-       - **Cloudflare DNS** (`1.1.1.1` и `1.0.0.1` или WARP), **Google Public DNS** (`8.8.8.8` и `8.8.4.4`), **Control D** или **AdGuard DNS**.
-       - Включение **DNS-over-HTTPS (DoH)** в браузере или настройках сети.
+3. **Обычную смену DNS всей системы делать не нужно.** ClaudeGravity по умолчанию включает собственный selective Smart DNS для Antigravity / Cloud Code API и использует `111.88.96.50` и `111.88.96.51` только для целевых API-хостов.
+4. Если Google всё равно возвращает `403 Forbidden`, `User location is not supported` или таймауты, проблема может быть связана с выходным IP/ASN. В таком случае попробуйте другой интернет-канал или VPN. Smart DNS не гарантирует доступ для аккаунтов или IP-адресов, которые Google блокирует отдельно.
+
+> [!IMPORTANT]
+> Команды ниже явно закрепляют источник установщика и всех скачиваемых launcher/patch-файлов на этом репозитории: `dantegolf/ClaudeGravity-`.
 
 ### Windows
 
 Откройте обычный **Windows PowerShell** и выполните:
 
 ```powershell
-irm https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-windows.ps1 | iex
+$env:CLAUDEGRAVITY_RAW_BASE='https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main'; irm "$env:CLAUDEGRAVITY_RAW_BASE/install-windows.ps1" | iex
 ```
 
 ### macOS
@@ -60,7 +56,7 @@ irm https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/inst
 Откройте **Терминал** и выполните:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-macos.sh)"
+CLAUDEGRAVITY_RAW_BASE="https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main" /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-macos.sh)"
 ```
 
 ### Linux
@@ -68,7 +64,7 @@ irm https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/inst
 Откройте терминал и выполните:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/main/install-linux.sh)"
+CLAUDEGRAVITY_RAW_BASE="https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main" bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-linux.sh)"
 ```
 
 Linux-установщик поддерживает `apt`, `dnf`, `pacman` и `zypper`. При необходимости он попросит `sudo` только для установки Node.js, npm и curl; сами компоненты ClaudeGravity устанавливаются в профиль пользователя.
@@ -86,7 +82,7 @@ Linux-установщик поддерживает `apt`, `dnf`, `pacman` и `z
 При первом запуске:
 
 1. Разрешите привязку Google-аккаунта в браузере.
-2. В Claude Desktop после аутентификации в любой аккаунт (после будет использоваться локальная учетная запись Вашей системы) не забудьте включить **Help → Troubleshooting → Enable Developer Mode**.
+2. В Claude Desktop после аутентификации в любой аккаунт не забудьте включить **Help → Troubleshooting → Enable Developer Mode**.
 3. Переключитесь в режим **Code**.
 4. Выберите модель в нижнем меню Claude.
 5. Не закрывайте окно ClaudeGravity: в нём работает временный Relay AI gateway.
@@ -101,9 +97,13 @@ Relay AI gateway
       │ localhost:8080
       ▼
 Antigravity Claude Proxy
-      │ Google OAuth
-      ▼
-Google Antigravity / Cloud Code models
+      │
+      ├── OAuth / accounts.google.com ─────────→ системный DNS
+      │
+      └── Antigravity / Cloud Code API ───────→ selective Smart DNS
+                         │                       111.88.96.50 / 111.88.96.51
+                         ▼
+              Google Antigravity / Cloud Code models
 ```
 
 ClaudeGravity при установке и каждом запуске проверяет npm и автоматически ставит актуальные версии:
@@ -115,7 +115,34 @@ ClaudeGravity при установке и каждом запуске пров�
 
 После обновления ClaudeGravity автоматически применяет проверяемый compatibility patch для протокола Antigravity 2.8. Он синхронизирует hub User-Agent, metadata и формат запросов Gemini 3.7. Если структура новой версии proxy неизвестна, запуск останавливается с понятной ошибкой вместо небезопасной правки неподходящих файлов.
 
+Тот же patch добавляет selective Smart DNS в сетевой слой proxy. По умолчанию через Smart DNS резолвятся только:
+
+- `cloudcode-pa.googleapis.com`
+- `daily-cloudcode-pa.googleapis.com`
+- `generativelanguage.googleapis.com`
+- `antigravity-unleash.goog`
+
+OAuth и все остальные хосты остаются на системном DNS. Если Smart DNS не отвечает или задан некорректно, ClaudeGravity автоматически возвращается к системному DNS для запроса.
+
 Конфигурация Relay AI хранится в `~/.relay-ai`. Установщик сохраняет другие провайдеры и пользовательское избранное, а стандартный набор моделей добавляет только один раз.
+
+### Управление Smart DNS
+
+По умолчанию ничего настраивать не нужно.
+
+Отключить selective Smart DNS для текущего запуска:
+
+```text
+CLAUDEGRAVITY_SMART_DNS=off
+```
+
+Задать собственные DNS-серверы:
+
+```text
+CLAUDEGRAVITY_SMART_DNS_SERVERS=111.88.96.50,111.88.96.51
+```
+
+Переменные должны быть заданы в окружении **до запуска ClaudeGravity**, чтобы их унаследовал `antigravity-claude-proxy`.
 
 ## ⌘ Полезные команды
 
@@ -133,7 +160,10 @@ ClaudeGravity при установке и каждом запуске пров�
 Повторно выполните установочную команду для своей платформы. Установщики идемпотентны: они обновят запускатели и сохранят аккаунты и настройки.
 
 **`User location is not supported for the API use`**  
-Это ответ Google Cloud Code, а не ошибка преобразования ClaudeGravity. Проверьте тот же аккаунт в официальном Antigravity и смените выходной IP/ASN VPN. Поддерживаемая страна сама по себе не гарантирует доступ: сервер может отклонять адреса хостинговых и дата-центровых сетей.
+Это ответ Google Cloud Code, а не ошибка преобразования ClaudeGravity. Встроенный Smart DNS уже применяется к целевым API-хостам. Если ошибка сохраняется, попробуйте другой выходной IP/ASN или VPN. Поддерживаемая страна сама по себе не гарантирует доступ: сервер может отклонять адреса хостинговых и дата-центровых сетей.
+
+**Хочу проверить работу без Smart DNS**  
+Запустите ClaudeGravity с `CLAUDEGRAVITY_SMART_DNS=off`. Если после этого поведение меняется, проблема, вероятно, связана с маршрутом до Smart DNS или выбранным DNS-сервером.
 
 **Claude Desktop не показывает модели**  
 Убедитесь, что включён Developer Mode, выбран режим Code, а окно ClaudeGravity остаётся открытым. Затем полностью перезапустите Claude Desktop.
