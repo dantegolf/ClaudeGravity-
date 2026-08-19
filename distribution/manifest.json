@@ -1,17 +1,20 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "ClaudeGravity",
   "distributionMode": "bundled-runtime",
   "engines": {
     "antigravityProxy": {
       "package": "antigravity-claude-proxy",
-      "version": "2.7.7",
+      "packageVersion": "2.7.7",
+      "installSpec": "github:badrisnarayanan/antigravity-claude-proxy#055699fcebcac83cea64bf599546a3ce820ebcdb",
+      "sourceRef": "055699fcebcac83cea64bf599546a3ce820ebcdb",
       "license": "MIT",
       "source": "https://github.com/badrisnarayanan/antigravity-claude-proxy"
     },
     "relayAi": {
       "package": "@jacobbd/relay-ai",
-      "version": "0.9.5",
+      "packageVersion": "0.9.5",
+      "installSpec": "0.9.5",
       "license": "MIT",
       "source": "https://github.com/jacob-bd/relay-ai"
     }

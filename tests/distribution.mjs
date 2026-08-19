@@ -11,12 +11,16 @@ const read = (path) => readFile(join(root, path), 'utf8');
 
 const manifest = JSON.parse(await read('distribution/manifest.json'));
 const exactVersion = /^\d+\.\d+\.\d+$/;
+const exactSha = /^[0-9a-f]{40}$/;
 for (const engine of Object.values(manifest.engines)) {
-  if (!exactVersion.test(engine.version)) throw new Error(`Engine version must be exact: ${engine.package}@${engine.version}`);
+  if (!exactVersion.test(engine.packageVersion)) throw new Error(`Engine packageVersion must be exact: ${engine.package}@${engine.packageVersion}`);
   if (engine.license !== 'MIT') throw new Error(`Unexpected engine license metadata for ${engine.package}`);
 }
-if (manifest.engines.antigravityProxy.version !== '2.7.7') throw new Error('Unexpected proxy pin');
-if (manifest.engines.relayAi.version !== '0.9.5') throw new Error('Unexpected Relay pin');
+if (!exactSha.test(manifest.engines.antigravityProxy.sourceRef)) throw new Error('Proxy sourceRef must be a full commit SHA');
+if (!manifest.engines.antigravityProxy.installSpec.endsWith(`#${manifest.engines.antigravityProxy.sourceRef}`)) {
+  throw new Error('Proxy installSpec must pin sourceRef exactly');
+}
+if (manifest.engines.relayAi.installSpec !== manifest.engines.relayAi.packageVersion) throw new Error('Relay installSpec must be an exact package version');
 
 for (const path of ['install-windows.ps1', 'install-macos.sh', 'install-linux.sh']) {
   const source = await read(path);
@@ -42,8 +46,13 @@ if (!builder.includes('ClaudeGravity selective Smart DNS v1')) throw new Error('
 if (builtRoot) {
   const proxyPackage = JSON.parse(await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/package.json'), 'utf8'));
   const relayPackage = JSON.parse(await readFile(join(builtRoot, 'runtime/node_modules/@jacobbd/relay-ai/package.json'), 'utf8'));
-  if (proxyPackage.version !== manifest.engines.antigravityProxy.version) throw new Error('Built proxy version differs from manifest');
-  if (relayPackage.version !== manifest.engines.relayAi.version) throw new Error('Built Relay version differs from manifest');
+  if (proxyPackage.version !== manifest.engines.antigravityProxy.packageVersion) throw new Error('Built proxy package version differs from manifest');
+  if (relayPackage.version !== manifest.engines.relayAi.packageVersion) throw new Error('Built Relay version differs from manifest');
+  const lock = JSON.parse(await readFile(join(builtRoot, 'runtime/package-lock.json'), 'utf8'));
+  const proxyLock = lock.packages?.['node_modules/antigravity-claude-proxy'];
+  if (!String(proxyLock?.resolved || '').includes(manifest.engines.antigravityProxy.sourceRef)) {
+    throw new Error('Built lockfile does not resolve the pinned proxy commit');
+  }
   const helpers = await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/src/utils/helpers.js'), 'utf8');
   if (!helpers.includes('ClaudeGravity selective Smart DNS v1')) throw new Error('Built runtime is missing Smart DNS patch');
   for (const required of ['ClaudeGravity.sh', 'ClaudeGravity.ps1', 'manifest.json', 'THIRD_PARTY_NOTICES.md']) {
