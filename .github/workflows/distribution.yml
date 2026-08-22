@@ -6,6 +6,7 @@ on:
       - '**'
     tags:
       - 'v*'
+      - '!v0.0.*'
   pull_request:
   workflow_dispatch:
 
@@ -59,7 +60,12 @@ jobs:
           else
             release_tag="v0.0.${GITHUB_RUN_NUMBER}"
           fi
-          gh release create "${release_tag}" artifacts/* \
-            --repo "${GITHUB_REPOSITORY}" \
-            --target "${GITHUB_SHA}" \
-            --generate-notes
+
+          if gh release view "${release_tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${release_tag}" artifacts/* --clobber --repo "${GITHUB_REPOSITORY}"
+          else
+            gh release create "${release_tag}" artifacts/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --target "${GITHUB_SHA}" \
+              --generate-notes
+          fi
