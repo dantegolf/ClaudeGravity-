@@ -9,6 +9,17 @@ bash -n \
   "${ROOT}/distribution/runtime/ClaudeGravity.sh" \
   "${ROOT}/distribution/runtime/Check-Limits.sh"
 
+for required in \
+  'create_command_launcher' \
+  'ClaudeGravity.command' \
+  'Check-Limits.command' \
+  'CLAUDEGRAVITY_DESKTOP_DIR'; do
+  grep -Fq "$required" "${ROOT}/install-macos.sh" || {
+    printf 'Missing macOS desktop launcher safeguard: %s\n' "$required" >&2
+    exit 1
+  }
+done
+
 node --check "${ROOT}/distribution/build-runtime.mjs"
 node --check "${ROOT}/launchers/scripts/configure-relay.mjs"
 node --check "${ROOT}/launchers/scripts/patch-antigravity-proxy.mjs"
