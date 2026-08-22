@@ -11,6 +11,16 @@ function Say($Message) {
   Write-Host "==> $Message"
 }
 
+function New-DesktopShortcut($ShortcutPath, $TargetPath, $Description) {
+  $shell = New-Object -ComObject WScript.Shell
+  $shortcut = $shell.CreateShortcut($ShortcutPath)
+  $shortcut.TargetPath = $TargetPath
+  $shortcut.WorkingDirectory = Split-Path $TargetPath -Parent
+  $shortcut.Description = $Description
+  $shortcut.WindowStyle = 1
+  $shortcut.Save()
+}
+
 Say "Установка ClaudeGravity bundled runtime"
 
 $nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
@@ -72,11 +82,19 @@ try {
   Remove-Item -LiteralPath $tempZip -Force -ErrorAction SilentlyContinue
 }
 
-foreach ($required in @("ClaudeGravity.cmd", "ClaudeGravity.ps1", "runtime", "scripts", "manifest.json")) {
+foreach ($required in @("ClaudeGravity.cmd", "ClaudeGravity.ps1", "Check-Limits.cmd", "runtime", "scripts", "manifest.json")) {
   if (-not (Test-Path -LiteralPath (Join-Path $InstallDir $required))) {
     throw "Runtime archive повреждён или неполон: отсутствует $required"
   }
 }
+
+Say "Создаю ярлыки на рабочем столе..."
+$DesktopDir = if ($env:CLAUDEGRAVITY_DESKTOP_DIR) { $env:CLAUDEGRAVITY_DESKTOP_DIR } else { [Environment]::GetFolderPath("Desktop") }
+if (-not $DesktopDir) { $DesktopDir = Join-Path $env:USERPROFILE "Desktop" }
+New-Item -ItemType Directory -Force -Path $DesktopDir | Out-Null
+New-DesktopShortcut -ShortcutPath (Join-Path $DesktopDir "ClaudeGravity.lnk") -TargetPath (Join-Path $InstallDir "ClaudeGravity.cmd") -Description "Запустить ClaudeGravity"
+New-DesktopShortcut -ShortcutPath (Join-Path $DesktopDir "Check-Limits.lnk") -TargetPath (Join-Path $InstallDir "Check-Limits.cmd") -Description "Проверить состояние ClaudeGravity"
+Say "Ярлыки созданы: $DesktopDir"
 
 Say "Готово: $InstallDir"
 if ($env:CLAUDEGRAVITY_SKIP_LAUNCH -eq "1") { exit 0 }

@@ -34,7 +34,11 @@ foreach ($required in @(
   'tar.exe',
   'Expand-Archive',
   'node.exe',
-  'CLAUDEGRAVITY_BUNDLE_URL'
+  'CLAUDEGRAVITY_BUNDLE_URL',
+  'CLAUDEGRAVITY_DESKTOP_DIR',
+  'WScript.Shell',
+  'ClaudeGravity.lnk',
+  'Check-Limits.lnk'
 )) {
   if ($installer -notmatch [regex]::Escape($required)) {
     throw "Missing bundled installer safeguard: $required"

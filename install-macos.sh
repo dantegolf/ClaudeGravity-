@@ -8,6 +8,18 @@ BUNDLE_URL="${CLAUDEGRAVITY_BUNDLE_URL:-${RELEASE_BASE}/ClaudeGravity-runtime.ta
 say() { printf '\n==> %s\n' "$1"; }
 has() { command -v "$1" >/dev/null 2>&1; }
 
+create_command_launcher() {
+  local destination="$1"
+  local target="$2"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'exec '
+    printf '%q' "$target"
+    printf '\n'
+  } > "$destination"
+  chmod +x "$destination"
+}
+
 say "Установка ClaudeGravity bundled runtime для macOS"
 
 if ! has node; then
@@ -35,9 +47,22 @@ tar -xzf "$tmp/runtime.tar.gz" -C "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR/ClaudeGravity.sh" "$INSTALL_DIR/Check-Limits.sh"
 xattr -dr com.apple.quarantine "$INSTALL_DIR" 2>/dev/null || true
 
-for required in ClaudeGravity.sh runtime scripts manifest.json; do
+for required in ClaudeGravity.sh Check-Limits.sh runtime scripts manifest.json; do
   [ -e "$INSTALL_DIR/$required" ] || { printf 'Runtime archive неполон: %s\n' "$required" >&2; exit 1; }
 done
+
+say "Создаю launchers для запуска двойным кликом..."
+create_command_launcher "$INSTALL_DIR/ClaudeGravity.command" "$INSTALL_DIR/ClaudeGravity.sh"
+create_command_launcher "$INSTALL_DIR/Check-Limits.command" "$INSTALL_DIR/Check-Limits.sh"
+
+DESKTOP_DIR="${CLAUDEGRAVITY_DESKTOP_DIR:-${HOME}/Desktop}"
+if mkdir -p "$DESKTOP_DIR" 2>/dev/null; then
+  create_command_launcher "$DESKTOP_DIR/ClaudeGravity.command" "$INSTALL_DIR/ClaudeGravity.sh"
+  create_command_launcher "$DESKTOP_DIR/Check-Limits.command" "$INSTALL_DIR/Check-Limits.sh"
+  say "Launchers созданы на рабочем столе: $DESKTOP_DIR"
+else
+  printf 'Не удалось создать launchers на рабочем столе: %s\n' "$DESKTOP_DIR" >&2
+fi
 
 say "Готово: $INSTALL_DIR"
 [ "${CLAUDEGRAVITY_SKIP_LAUNCH:-0}" = "1" ] && exit 0
