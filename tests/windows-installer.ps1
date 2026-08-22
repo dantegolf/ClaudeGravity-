@@ -15,10 +15,12 @@ function Parse-Script($Path) {
 $root = Split-Path $PSScriptRoot -Parent
 $installerPath = Join-Path $root "install-windows.ps1"
 $launcherPath = Join-Path $root "distribution\runtime\ClaudeGravity.ps1"
+$cmdPath = Join-Path $root "distribution\runtime\ClaudeGravity.cmd"
 $limitsPath = Join-Path $root "distribution\runtime\Check-Limits.ps1"
 $supervisorPath = Join-Path $root "launchers\scripts\supervisor.mjs"
 $desktopConfigPath = Join-Path $root "launchers\scripts\configure-claude-desktop.mjs"
 $configureRelayPath = Join-Path $root "launchers\scripts\configure-relay.mjs"
+$patchPath = Join-Path $root "launchers\scripts\patch-antigravity-proxy.mjs"
 
 $installerBytes = [System.IO.File]::ReadAllBytes($installerPath)
 if ($installerBytes.Count -ge 3 -and $installerBytes[0] -eq 0xEF -and $installerBytes[1] -eq 0xBB -and $installerBytes[2] -eq 0xBF) {
@@ -27,10 +29,12 @@ if ($installerBytes.Count -ge 3 -and $installerBytes[0] -eq 0xEF -and $installer
 
 $installer = Parse-Script $installerPath
 $launcher = Parse-Script $launcherPath
+$cmd = Get-Content -LiteralPath $cmdPath -Raw
 $limits = Parse-Script $limitsPath
 $supervisor = Get-Content -LiteralPath $supervisorPath -Raw
 $desktopConfig = Get-Content -LiteralPath $desktopConfigPath -Raw
 $configureRelay = Get-Content -LiteralPath $configureRelayPath -Raw
+$patch = Get-Content -LiteralPath $patchPath -Raw
 
 foreach ($required in @(
   'dantegolf/ClaudeGravity-/releases/latest/download',
@@ -44,7 +48,9 @@ foreach ($required in @(
   'CLAUDEGRAVITY_DESKTOP_DIR',
   'WScript.Shell',
   'ClaudeGravity.lnk',
-  'Check-Limits.lnk'
+  'Check-Limits.lnk',
+  '-WindowStyle Hidden',
+  '$shortcut.Arguments'
 )) {
   if ($installer -notmatch [regex]::Escape($required)) {
     throw "Missing bundled installer safeguard: $required"
@@ -69,10 +75,13 @@ foreach ($forbidden in @('olegsuper338-lgtm', 'npm.cmd', '@latest', 'npm install
   }
 }
 
-foreach ($required in @('supervisor.mjs', 'RELAY_AI_HOME', 'ANTIGRAVITY_API_KEY')) {
+foreach ($required in @('supervisor.mjs', 'RELAY_AI_HOME', 'ANTIGRAVITY_API_KEY', 'Start-Process', '-WindowStyle Hidden', 'CLAUDEGRAVITY_FOREGROUND')) {
   if ($launcher -notmatch [regex]::Escape($required)) {
-    throw "Missing unified launcher safeguard: $required"
+    throw "Missing silent unified launcher safeguard: $required"
   }
+}
+if ($cmd -notmatch [regex]::Escape('-WindowStyle Hidden')) {
+  throw 'ClaudeGravity.cmd must hide the bootstrap PowerShell window.'
 }
 foreach ($forbidden in @('claude-app', 'http://127.0.0.1:8080', 'npm install', 'acc.cmd', 'relay-ai.cmd')) {
   if ($launcher -match [regex]::Escape($forbidden)) {
@@ -83,20 +92,36 @@ foreach ($forbidden in @('claude-app', 'http://127.0.0.1:8080', 'npm install', '
 foreach ($required in @(
   '18080',
   '17645',
+  '17646',
   'HOST: ''127.0.0.1''',
   '''server''',
   '''--quick''',
   '''custom-antigravity''',
   '''--mask-gateway-ids''',
   'applyClaudeDesktopConfig',
-  'restoreClaudeDesktopConfig'
+  'restoreClaudeDesktopConfig',
+  '''/logs/stream''',
+  '''/action/open-claude''',
+  '''/action/restart''',
+  '''/action/stop''',
+  'claudegravity.log',
+  "stdio: ['ignore', 'pipe', 'pipe']"
 )) {
   if ($supervisor -notmatch [regex]::Escape($required)) {
-    throw "Missing supervisor safeguard: $required"
+    throw "Missing supervisor WebUI safeguard: $required"
   }
+}
+if ($supervisor -match [regex]::Escape("stdio: 'inherit'")) {
+  throw 'Supervisor must not dump engine logs into the terminal.'
 }
 if ($supervisor -match [regex]::Escape("'claude-app'")) {
   throw 'Unified supervisor must not launch Relay claude-app because it creates a second public proxy.'
+}
+
+foreach ($required in @('ClaudeGravity WebUI v1', 'ClaudeGravity', 'LOCAL AI GATEWAY', 'CLAUDEGRAVITY_CONTROL_URL', 'Open Claude')) {
+  if ($patch -notmatch [regex]::Escape($required)) {
+    throw "Missing WebUI branding safeguard: $required"
+  }
 }
 
 if ($configureRelay -notmatch [regex]::Escape('http://127.0.0.1:18080')) {
@@ -111,9 +136,9 @@ foreach ($required in @('http://127.0.0.1:17645/health', 'http://127.0.0.1:18080
   }
 }
 
-foreach ($script in @($supervisorPath, $desktopConfigPath, $configureRelayPath)) {
+foreach ($script in @($supervisorPath, $desktopConfigPath, $configureRelayPath, $patchPath)) {
   & node.exe --check $script
   if ($LASTEXITCODE -ne 0) { throw "Node syntax check failed: $script" }
 }
 
-Write-Host "Windows bundled distribution checks passed."
+Write-Host "Windows silent WebUI distribution checks passed."
