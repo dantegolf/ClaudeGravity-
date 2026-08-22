@@ -53,6 +53,14 @@ const helpers = await readFile(join(proxyRoot, 'src', 'utils', 'helpers.js'), 'u
 if (!helpers.includes('ClaudeGravity selective Smart DNS v1')) {
   throw new Error('Bundled proxy is missing the ClaudeGravity selective Smart DNS patch.');
 }
+const webUi = await readFile(join(proxyRoot, 'public', 'index.html'), 'utf8');
+if (!webUi.includes('ClaudeGravity WebUI v1') || !webUi.includes('<title>ClaudeGravity</title>')) {
+  throw new Error('Bundled proxy is missing the ClaudeGravity WebUI patch.');
+}
+const webUiLogs = await readFile(join(proxyRoot, 'public', 'js', 'components', 'logs-viewer.js'), 'utf8');
+if (!webUiLogs.includes('CLAUDEGRAVITY_CONTROL_URL')) {
+  throw new Error('Bundled WebUI is not connected to ClaudeGravity background logs.');
+}
 
 const copies = [
   ['distribution/runtime/ClaudeGravity.sh', 'ClaudeGravity.sh'],
@@ -80,12 +88,15 @@ if (process.platform !== 'win32') {
 
 const packageLock = JSON.parse(await readFile(join(runtimeDir, 'package-lock.json'), 'utf8'));
 const buildInfo = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   builtAt: new Date().toISOString(),
   gateway: {
     publicBaseUrl: 'http://127.0.0.1:17645/anthropic',
-    antigravityInternalBaseUrl: 'http://127.0.0.1:18080'
+    antigravityInternalBaseUrl: 'http://127.0.0.1:18080',
+    webUiUrl: 'http://127.0.0.1:18080/',
+    controlBaseUrl: 'http://127.0.0.1:17646'
   },
+  launchMode: 'background-webui',
   engines: {
     antigravityProxy: {
       packageVersion: manifest.engines.antigravityProxy.packageVersion,
