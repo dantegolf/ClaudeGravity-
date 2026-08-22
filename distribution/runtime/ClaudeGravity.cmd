@@ -1,3 +1,3 @@
 @echo off
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0ClaudeGravity.ps1"
-exit /b %ERRORLEVEL%
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0ClaudeGravity.ps1"
+exit /b 0
