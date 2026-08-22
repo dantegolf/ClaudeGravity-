@@ -62,6 +62,8 @@ const copies = [
   ['distribution/runtime/Check-Limits.ps1', 'Check-Limits.ps1'],
   ['distribution/runtime/Check-Limits.cmd', 'Check-Limits.cmd'],
   ['launchers/scripts/configure-relay.mjs', 'scripts/configure-relay.mjs'],
+  ['launchers/scripts/configure-claude-desktop.mjs', 'scripts/configure-claude-desktop.mjs'],
+  ['launchers/scripts/supervisor.mjs', 'scripts/supervisor.mjs'],
   ['launchers/scripts/patch-antigravity-proxy.mjs', 'scripts/patch-antigravity-proxy.mjs'],
   ['distribution/manifest.json', 'manifest.json'],
   ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md']
@@ -78,8 +80,12 @@ if (process.platform !== 'win32') {
 
 const packageLock = JSON.parse(await readFile(join(runtimeDir, 'package-lock.json'), 'utf8'));
 const buildInfo = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   builtAt: new Date().toISOString(),
+  gateway: {
+    publicBaseUrl: 'http://127.0.0.1:17645/anthropic',
+    antigravityInternalBaseUrl: 'http://127.0.0.1:18080'
+  },
   engines: {
     antigravityProxy: {
       packageVersion: manifest.engines.antigravityProxy.packageVersion,
