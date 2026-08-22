@@ -39,7 +39,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
     needs: build-runtime
     runs-on: ubuntu-latest
     permissions:
@@ -52,4 +52,14 @@ jobs:
       - name: Publish ClaudeGravity release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" artifacts/* --repo "${GITHUB_REPOSITORY}" --generate-notes
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            release_tag="${GITHUB_REF_NAME}"
+          else
+            release_tag="v0.0.${GITHUB_RUN_NUMBER}"
+          fi
+          gh release create "${release_tag}" artifacts/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --generate-notes
