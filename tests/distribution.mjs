@@ -35,13 +35,40 @@ for (const path of ['install-windows.ps1', 'install-macos.sh', 'install-linux.sh
 for (const path of ['distribution/runtime/ClaudeGravity.sh', 'distribution/runtime/ClaudeGravity.ps1']) {
   const source = await read(path);
   if (source.includes('npm install')) throw new Error(`${path} must never update runtime packages`);
-  if (!source.includes('node_modules')) throw new Error(`${path} does not use the bundled runtime`);
-  if (!source.includes('patch-antigravity-proxy.mjs')) throw new Error(`${path} does not verify the bundled proxy`);
+  if (!source.includes('supervisor.mjs')) throw new Error(`${path} must delegate orchestration to the bundled supervisor`);
+  if (source.includes('claude-app')) throw new Error(`${path} must not start Relay claude-app because it creates another proxy`);
+  if (source.includes('127.0.0.1:8080')) throw new Error(`${path} still references the legacy public proxy port`);
 }
+
+const supervisor = await read('launchers/scripts/supervisor.mjs');
+for (const required of [
+  'node_modules',
+  'patch-antigravity-proxy.mjs',
+  '127.0.0.1',
+  '18080',
+  '17645',
+  "'server'",
+  "'--quick'",
+  "'custom-antigravity'",
+  "'--mask-gateway-ids'",
+  'applyClaudeDesktopConfig',
+  'restoreClaudeDesktopConfig',
+]) {
+  if (!supervisor.includes(required)) throw new Error(`Unified supervisor missing safeguard: ${required}`);
+}
+if (supervisor.includes("'claude-app'")) throw new Error('Unified supervisor must not use Relay claude-app');
+
+const relayConfig = await read('launchers/scripts/configure-relay.mjs');
+if (!relayConfig.includes('http://127.0.0.1:18080')) throw new Error('Relay config must default to the internal Antigravity port');
+const desktopConfig = await read('launchers/scripts/configure-claude-desktop.mjs');
+if (!desktopConfig.includes('inferenceGatewayBaseUrl')) throw new Error('Claude Desktop gateway configuration is missing');
 
 const builder = await read('distribution/build-runtime.mjs');
 if (!builder.includes("'--omit=optional'")) throw new Error('Runtime build must omit architecture-specific optional dependencies');
 if (!builder.includes('ClaudeGravity selective Smart DNS v1')) throw new Error('Runtime build does not verify Smart DNS');
+for (const required of ['scripts/supervisor.mjs', 'scripts/configure-claude-desktop.mjs']) {
+  if (!builder.includes(required)) throw new Error(`Runtime build does not bundle ${required}`);
+}
 
 if (builtRoot) {
   const proxyPackage = JSON.parse(await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/package.json'), 'utf8'));
@@ -55,9 +82,20 @@ if (builtRoot) {
   }
   const helpers = await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/src/utils/helpers.js'), 'utf8');
   if (!helpers.includes('ClaudeGravity selective Smart DNS v1')) throw new Error('Built runtime is missing Smart DNS patch');
-  for (const required of ['ClaudeGravity.sh', 'ClaudeGravity.ps1', 'manifest.json', 'THIRD_PARTY_NOTICES.md']) {
+  for (const required of [
+    'ClaudeGravity.sh',
+    'ClaudeGravity.ps1',
+    'manifest.json',
+    'THIRD_PARTY_NOTICES.md',
+    'scripts/supervisor.mjs',
+    'scripts/configure-claude-desktop.mjs',
+    'scripts/configure-relay.mjs',
+  ]) {
     await readFile(join(builtRoot, required));
   }
+  const buildInfo = JSON.parse(await readFile(join(builtRoot, 'BUILD_INFO.json'), 'utf8'));
+  if (buildInfo.gateway?.publicBaseUrl !== 'http://127.0.0.1:17645/anthropic') throw new Error('Built runtime does not declare the unified public gateway');
+  if (buildInfo.gateway?.antigravityInternalBaseUrl !== 'http://127.0.0.1:18080') throw new Error('Built runtime does not declare the internal engine endpoint');
 }
 
 console.log('ClaudeGravity distribution checks passed.');
