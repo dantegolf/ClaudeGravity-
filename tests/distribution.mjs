@@ -36,9 +36,12 @@ for (const path of ['distribution/runtime/ClaudeGravity.sh', 'distribution/runti
   const source = await read(path);
   if (source.includes('npm install')) throw new Error(`${path} must never update runtime packages`);
   if (!source.includes('supervisor.mjs')) throw new Error(`${path} must delegate orchestration to the bundled supervisor`);
+  if (!source.includes('CLAUDEGRAVITY_FOREGROUND')) throw new Error(`${path} must support an explicit foreground diagnostics mode`);
   if (source.includes('claude-app')) throw new Error(`${path} must not start Relay claude-app because it creates another proxy`);
   if (source.includes('127.0.0.1:8080')) throw new Error(`${path} still references the legacy public proxy port`);
 }
+if (!(await read('distribution/runtime/ClaudeGravity.sh')).includes('nohup')) throw new Error('Unix launcher must detach the supervisor from Terminal');
+if (!(await read('distribution/runtime/ClaudeGravity.ps1')).includes('-WindowStyle Hidden')) throw new Error('Windows launcher must hide the background supervisor');
 
 const supervisor = await read('launchers/scripts/supervisor.mjs');
 for (const required of [
@@ -47,21 +50,34 @@ for (const required of [
   '127.0.0.1',
   '18080',
   '17645',
+  '17646',
   "'server'",
   "'--quick'",
   "'custom-antigravity'",
   "'--mask-gateway-ids'",
   'applyClaudeDesktopConfig',
   'restoreClaudeDesktopConfig',
+  "stdio: ['ignore', 'pipe', 'pipe']",
+  "'/logs/stream'",
+  "'/action/open-claude'",
+  "'/action/restart'",
+  "'/action/stop'",
+  'claudegravity.log',
+  'Existing ClaudeGravity instance detected',
 ]) {
-  if (!supervisor.includes(required)) throw new Error(`Unified supervisor missing safeguard: ${required}`);
+  if (!supervisor.includes(required)) throw new Error(`Silent WebUI supervisor missing safeguard: ${required}`);
 }
+if (supervisor.includes("stdio: 'inherit'")) throw new Error('Supervisor must not inherit child output into the terminal');
 if (supervisor.includes("'claude-app'")) throw new Error('Unified supervisor must not use Relay claude-app');
 
 const relayConfig = await read('launchers/scripts/configure-relay.mjs');
 if (!relayConfig.includes('http://127.0.0.1:18080')) throw new Error('Relay config must default to the internal Antigravity port');
 const desktopConfig = await read('launchers/scripts/configure-claude-desktop.mjs');
 if (!desktopConfig.includes('inferenceGatewayBaseUrl')) throw new Error('Claude Desktop gateway configuration is missing');
+const proxyPatch = await read('launchers/scripts/patch-antigravity-proxy.mjs');
+for (const required of ['ClaudeGravity WebUI v1', 'LOCAL AI GATEWAY', 'CLAUDEGRAVITY_CONTROL_URL', 'Open Claude', 'logs/stream?history=true']) {
+  if (!proxyPatch.includes(required)) throw new Error(`Proxy patch is missing WebUI safeguard: ${required}`);
+}
 
 const builder = await read('distribution/build-runtime.mjs');
 if (!builder.includes("'--omit=optional'")) throw new Error('Runtime build must omit architecture-specific optional dependencies');
@@ -82,6 +98,11 @@ if (builtRoot) {
   }
   const helpers = await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/src/utils/helpers.js'), 'utf8');
   if (!helpers.includes('ClaudeGravity selective Smart DNS v1')) throw new Error('Built runtime is missing Smart DNS patch');
+  const brandedUi = await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/public/index.html'), 'utf8');
+  if (!brandedUi.includes('ClaudeGravity WebUI v1')) throw new Error('Built runtime is missing the ClaudeGravity WebUI branding patch');
+  if (!brandedUi.includes('<title>ClaudeGravity</title>')) throw new Error('Built runtime still exposes the Antigravity Console title');
+  const brandedLogs = await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/public/js/components/logs-viewer.js'), 'utf8');
+  if (!brandedLogs.includes('CLAUDEGRAVITY_CONTROL_URL')) throw new Error('Built WebUI logs are not connected to the background supervisor');
   for (const required of [
     'ClaudeGravity.sh',
     'ClaudeGravity.ps1',
@@ -98,4 +119,4 @@ if (builtRoot) {
   if (buildInfo.gateway?.antigravityInternalBaseUrl !== 'http://127.0.0.1:18080') throw new Error('Built runtime does not declare the internal engine endpoint');
 }
 
-console.log('ClaudeGravity distribution checks passed.');
+console.log('ClaudeGravity silent WebUI distribution checks passed.');

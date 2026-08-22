@@ -11,13 +11,14 @@ function Say($Message) {
   Write-Host "==> $Message"
 }
 
-function New-DesktopShortcut($ShortcutPath, $TargetPath, $Description) {
+function New-DesktopShortcut($ShortcutPath, $TargetPath, $Description, $Arguments = $null, $WorkingDirectory = $null) {
   $shell = New-Object -ComObject WScript.Shell
   $shortcut = $shell.CreateShortcut($ShortcutPath)
   $shortcut.TargetPath = $TargetPath
-  $shortcut.WorkingDirectory = Split-Path $TargetPath -Parent
+  $shortcut.WorkingDirectory = if ($WorkingDirectory) { $WorkingDirectory } else { Split-Path $TargetPath -Parent }
   $shortcut.Description = $Description
-  $shortcut.WindowStyle = 1
+  if ($Arguments) { $shortcut.Arguments = $Arguments }
+  $shortcut.WindowStyle = 7
   $shortcut.Save()
 }
 
@@ -92,10 +93,13 @@ Say "Создаю ярлыки на рабочем столе..."
 $DesktopDir = if ($env:CLAUDEGRAVITY_DESKTOP_DIR) { $env:CLAUDEGRAVITY_DESKTOP_DIR } else { [Environment]::GetFolderPath("Desktop") }
 if (-not $DesktopDir) { $DesktopDir = Join-Path $env:USERPROFILE "Desktop" }
 New-Item -ItemType Directory -Force -Path $DesktopDir | Out-Null
-New-DesktopShortcut -ShortcutPath (Join-Path $DesktopDir "ClaudeGravity.lnk") -TargetPath (Join-Path $InstallDir "ClaudeGravity.cmd") -Description "Запустить ClaudeGravity"
+$PowerShellExe = (Get-Command powershell.exe -ErrorAction Stop).Source
+$LauncherScript = Join-Path $InstallDir "ClaudeGravity.ps1"
+$LauncherArgs = '-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $LauncherScript + '"'
+New-DesktopShortcut -ShortcutPath (Join-Path $DesktopDir "ClaudeGravity.lnk") -TargetPath $PowerShellExe -Arguments $LauncherArgs -WorkingDirectory $InstallDir -Description "Открыть ClaudeGravity"
 New-DesktopShortcut -ShortcutPath (Join-Path $DesktopDir "Check-Limits.lnk") -TargetPath (Join-Path $InstallDir "Check-Limits.cmd") -Description "Проверить состояние ClaudeGravity"
 Say "Ярлыки созданы: $DesktopDir"
 
 Say "Готово: $InstallDir"
 if ($env:CLAUDEGRAVITY_SKIP_LAUNCH -eq "1") { exit 0 }
-& (Join-Path $InstallDir "ClaudeGravity.cmd")
+& (Join-Path $InstallDir "ClaudeGravity.ps1")

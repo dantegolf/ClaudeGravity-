@@ -29,6 +29,35 @@ export async function throttledFetch(url, options) {
 }
 `;
 
+const indexHtmlSource = `<!DOCTYPE html>
+<html lang="en" data-theme="antigravity" class="dark">
+<head><title>Antigravity Console</title></head>
+<body class="selection:bg-neon-purple">
+<div class="w-8 h-8 bg-gradient-to-br from-neon-purple to-blue-600 shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+                AG</div>
+<span x-text="$store.global.t('systemName')">ANTIGRAVITY</span>
+<span x-text="$store.global.t('systemDesc')">CLAUDE PROXY SYSTEM</span>
+            <!-- Refresh Button -->
+<script src="js/translations/en.js"></script>
+    <!-- 2. Alpine Stores (register alpine:init listeners) -->
+</body></html>`;
+
+const logsViewerSource = `
+window.Components = window.Components || {};
+window.Components.logsViewer = () => ({
+    startLogStream() {
+        if (this.eventSource) this.eventSource.close();
+
+        const password = Alpine.store('global').webuiPassword;
+        const url = password
+            ? \`/api/logs/stream?history=true&password=\${encodeURIComponent(password)}\`
+            : '/api/logs/stream?history=true';
+
+        this.eventSource = new EventSource(url);
+    }
+});
+`;
+
 const sources = {
   "package.json": '{"name":"antigravity-claude-proxy","version":"2.8.5"}',
   "src/utils/helpers.js": helpersSource,
@@ -97,7 +126,9 @@ export function clampGeminiThinkingBudget(modelName, budget) {
     const requestedBudget = budget || GEMINI_DEFAULT_THINKING_BUDGET;
     const lower = (modelName || '').toLowerCase();
     return requestedBudget;
-}`
+}`,
+  "public/index.html": indexHtmlSource,
+  "public/js/components/logs-viewer.js": logsViewerSource,
 };
 
 for (const [name, content] of Object.entries(sources)) {
@@ -111,6 +142,7 @@ const first = runPatch();
 assert.equal(first.status, 0, first.stderr);
 assert.match(first.stdout, /Applied Antigravity 2\.8 compatibility/);
 assert.match(first.stdout, /Applied ClaudeGravity selective Smart DNS routing/);
+assert.match(first.stdout, /Applied ClaudeGravity WebUI branding/);
 
 const constants = await readFile(join(fixture, "src/constants.js"), "utf8");
 assert.match(constants, /antigravity\/hub\/\$\{version\}/);
@@ -138,10 +170,25 @@ assert.match(helpers, /111\.88\.96\.50,111\.88\.96\.51/);
 assert.match(helpers, /undiciFetch\(url, \{ \.\.\.options, dispatcher \}\)/);
 assert.match(helpers, /systemLookup\(hostname, options, callback\)/);
 
+const webUi = await readFile(join(fixture, "public/index.html"), "utf8");
+assert.match(webUi, /<title>ClaudeGravity<\/title>/);
+assert.match(webUi, /ClaudeGravity WebUI v1/);
+assert.match(webUi, />\s*CG<\/div>/);
+assert.match(webUi, /LOCAL AI GATEWAY/);
+assert.match(webUi, /claudegravity-gateway-status/);
+assert.match(webUi, /Open Claude/);
+assert.match(webUi, /action\('restart'\)/);
+assert.match(webUi, /action\('stop'\)/);
+assert.match(webUi, /http:\/\/127\.0\.0\.1:17646/);
+const webLogs = await readFile(join(fixture, "public/js/components/logs-viewer.js"), "utf8");
+assert.match(webLogs, /CLAUDEGRAVITY_CONTROL_URL/);
+assert.match(webLogs, /logs\/stream\?history=true/);
+
 const second = runPatch();
 assert.equal(second.status, 0, second.stderr);
 assert.match(second.stdout, /already applied/);
 assert.match(second.stdout, /selective Smart DNS routing is already applied/);
+assert.match(second.stdout, /WebUI branding is already applied/);
 
 const nativeFixture = await mkdtemp(join(tmpdir(), "claudegravity-proxy-native-"));
 const nativeSources = {
@@ -152,7 +199,9 @@ export function getPlatformUserAgent() { return 'antigravity/hub/3.0.0'; }
 export const CLIENT_METADATA = { ideType: 'ANTIGRAVITY' };
 export const ANTIGRAVITY_HEADERS = { 'Content-Type': 'application/json' };`,
   "src/cloudcode/model-api.js": `const body = { metadata: CLIENT_METADATA };`,
-  "src/cloudcode/request-builder.js": "const payload = { requestId: `agent/${crypto.randomUUID()}` };"
+  "src/cloudcode/request-builder.js": "const payload = { requestId: `agent/${crypto.randomUUID()}` };",
+  "public/index.html": indexHtmlSource,
+  "public/js/components/logs-viewer.js": logsViewerSource,
 };
 for (const [name, content] of Object.entries(nativeSources)) {
   const path = join(nativeFixture, name);
@@ -163,7 +212,10 @@ const nativeRun = runPatch(nativeFixture);
 assert.equal(nativeRun.status, 0, nativeRun.stderr);
 assert.match(nativeRun.stdout, /already supports the Antigravity 2\.8 protocol/);
 assert.match(nativeRun.stdout, /Applied ClaudeGravity selective Smart DNS routing/);
+assert.match(nativeRun.stdout, /Applied ClaudeGravity WebUI branding/);
 const nativeHelpers = await readFile(join(nativeFixture, "src/utils/helpers.js"), "utf8");
 assert.match(nativeHelpers, /ClaudeGravity selective Smart DNS v1/);
+const nativeWebUi = await readFile(join(nativeFixture, "public/index.html"), "utf8");
+assert.match(nativeWebUi, /ClaudeGravity WebUI v1/);
 
-console.log("Antigravity proxy compatibility and Smart DNS checks passed.");
+console.log("Antigravity proxy compatibility, Smart DNS, and WebUI checks passed.");

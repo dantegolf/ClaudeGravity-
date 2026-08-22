@@ -11,14 +11,42 @@ bash -n \
 
 for required in \
   'create_command_launcher' \
-  'ClaudeGravity.command' \
+  'create_app_launcher' \
+  'ClaudeGravity.app' \
   'Check-Limits.command' \
+  'osacompile' \
   'CLAUDEGRAVITY_DESKTOP_DIR'; do
   grep -Fq "$required" "${ROOT}/install-macos.sh" || {
-    printf 'Missing macOS desktop launcher safeguard: %s\n' "$required" >&2
+    printf 'Missing macOS launcher safeguard: %s\n' "$required" >&2
     exit 1
   }
 done
+
+for required in \
+  'nohup' \
+  'CLAUDEGRAVITY_FOREGROUND' \
+  'supervisor.mjs'; do
+  grep -Fq "$required" "${ROOT}/distribution/runtime/ClaudeGravity.sh" || {
+    printf 'Missing silent Unix launcher safeguard: %s\n' "$required" >&2
+    exit 1
+  }
+done
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  APP_TEST_ROOT="$(mktemp -d)/Claude Gravity Test"
+  mkdir -p "$APP_TEST_ROOT"
+  TARGET="$APP_TEST_ROOT/ClaudeGravity.sh"
+  APP="$APP_TEST_ROOT/ClaudeGravity.app"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$TARGET"
+  chmod +x "$TARGET"
+  escaped="$TARGET"
+  escaped="${escaped//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  osacompile -o "$APP" -e "do shell script \"\\\"${escaped}\\\"\"" >/dev/null
+  test -d "$APP/Contents"
+  plutil -lint "$APP/Contents/Info.plist" >/dev/null
+  rm -rf "$(dirname "$APP_TEST_ROOT")"
+fi
 
 node --check "${ROOT}/distribution/build-runtime.mjs"
 node --check "${ROOT}/launchers/scripts/configure-relay.mjs"

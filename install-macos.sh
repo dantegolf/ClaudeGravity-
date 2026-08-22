@@ -20,6 +20,16 @@ create_command_launcher() {
   chmod +x "$destination"
 }
 
+create_app_launcher() {
+  local destination="$1"
+  local target="$2"
+  local escaped="$target"
+  escaped="${escaped//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  rm -rf "$destination"
+  osacompile -o "$destination" -e "do shell script \"\\\"${escaped}\\\"\"" >/dev/null
+}
+
 say "Установка ClaudeGravity bundled runtime для macOS"
 
 if ! has node; then
@@ -36,6 +46,7 @@ node -e 'if (Number(process.versions.node.split(".")[0]) < 18) process.exit(1)' 
   exit 1
 }
 has curl || { printf 'Требуется curl.\n' >&2; exit 1; }
+has osacompile || { printf 'Требуется стандартный macOS osacompile.\n' >&2; exit 1; }
 
 say "Скачиваю проверенный ClaudeGravity runtime из нашего GitHub Release..."
 tmp="$(mktemp -d)"
@@ -51,15 +62,16 @@ for required in ClaudeGravity.sh Check-Limits.sh runtime scripts manifest.json; 
   [ -e "$INSTALL_DIR/$required" ] || { printf 'Runtime archive неполон: %s\n' "$required" >&2; exit 1; }
 done
 
-say "Создаю launchers для запуска двойным кликом..."
+say "Создаю launchers для запуска без Terminal..."
 create_command_launcher "$INSTALL_DIR/ClaudeGravity.command" "$INSTALL_DIR/ClaudeGravity.sh"
 create_command_launcher "$INSTALL_DIR/Check-Limits.command" "$INSTALL_DIR/Check-Limits.sh"
+create_app_launcher "$INSTALL_DIR/ClaudeGravity.app" "$INSTALL_DIR/ClaudeGravity.sh"
 
 DESKTOP_DIR="${CLAUDEGRAVITY_DESKTOP_DIR:-${HOME}/Desktop}"
 if mkdir -p "$DESKTOP_DIR" 2>/dev/null; then
-  create_command_launcher "$DESKTOP_DIR/ClaudeGravity.command" "$INSTALL_DIR/ClaudeGravity.sh"
+  create_app_launcher "$DESKTOP_DIR/ClaudeGravity.app" "$INSTALL_DIR/ClaudeGravity.sh"
   create_command_launcher "$DESKTOP_DIR/Check-Limits.command" "$INSTALL_DIR/Check-Limits.sh"
-  say "Launchers созданы на рабочем столе: $DESKTOP_DIR"
+  say "ClaudeGravity.app создан на рабочем столе: $DESKTOP_DIR"
 else
   printf 'Не удалось создать launchers на рабочем столе: %s\n' "$DESKTOP_DIR" >&2
 fi

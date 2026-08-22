@@ -30,6 +30,7 @@ const replaceExact = async (name, before, after, alreadyAppliedMarker = null) =>
 };
 
 const SMART_DNS_MARKER = "ClaudeGravity selective Smart DNS v1";
+const WEBUI_MARKER = "ClaudeGravity WebUI v1";
 
 const patchSmartDns = async () => {
   const name = "src/utils/helpers.js";
@@ -125,6 +126,133 @@ function claudeGravitySmartDnsDispatcher(url, options) {
   return true;
 };
 
+const patchWebUi = async () => {
+  const indexName = "public/index.html";
+  let index = await load(indexName);
+  let webUiChanged = false;
+
+  if (!index.includes(WEBUI_MARKER)) {
+    const required = [
+      '<title>Antigravity Console</title>',
+      'selection:bg-neon-purple',
+      'from-neon-purple to-blue-600',
+      'x-text="$store.global.t(\'systemName\')">ANTIGRAVITY</span>',
+      'x-text="$store.global.t(\'systemDesc\')">CLAUDE PROXY SYSTEM</span>',
+      '            <!-- Refresh Button -->',
+      '    <!-- 2. Alpine Stores (register alpine:init listeners) -->',
+    ];
+    for (const token of required) {
+      if (index.split(token).length - 1 !== 1) {
+        throw new Error(`${indexName}: expected one WebUI branding anchor: ${token}`);
+      }
+    }
+
+    index = index
+      .replace('<title>Antigravity Console</title>', '<title>ClaudeGravity</title>')
+      .replace('selection:bg-neon-purple', 'selection:bg-neon-cyan')
+      .replace('from-neon-purple to-blue-600', 'from-cyan-400 to-violet-600')
+      .replace('shadow-[0_0_15px_rgba(168,85,247,0.4)]">\n                AG</div>', 'shadow-[0_0_15px_rgba(34,211,238,0.35)]">\n                CG</div>')
+      .replace('x-text="$store.global.t(\'systemName\')">ANTIGRAVITY</span>', 'x-text="$store.global.t(\'systemName\')">ClaudeGravity</span>')
+      .replace('x-text="$store.global.t(\'systemDesc\')">CLAUDE PROXY SYSTEM</span>', 'x-text="$store.global.t(\'systemDesc\')">LOCAL AI GATEWAY</span>');
+
+    const controlMarkup = `            <!-- ${WEBUI_MARKER}: supervisor controls -->
+            <div class="hidden md:flex items-center gap-2">
+                <div class="flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-mono border border-cyan-400/20 bg-cyan-400/5 text-gray-400">
+                    <span>GATEWAY</span>
+                    <span id="claudegravity-gateway-status" class="font-bold text-yellow-400">STARTING</span>
+                </div>
+                <button type="button" class="btn btn-xs border-cyan-400/20 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20" onclick="window.ClaudeGravity.openClaude()">Open Claude</button>
+                <button type="button" class="btn btn-xs btn-ghost text-gray-400 hover:text-white" onclick="window.ClaudeGravity.restart()">Restart</button>
+                <button type="button" class="btn btn-xs btn-ghost text-red-400 hover:bg-red-500/10" onclick="window.ClaudeGravity.stop()">Stop</button>
+            </div>
+
+            <!-- Refresh Button -->`;
+    index = index.replace('            <!-- Refresh Button -->', controlMarkup);
+
+    const controlScript = `    <script>
+      // ${WEBUI_MARKER}
+      (() => {
+        const controlUrl = 'http://127.0.0.1:17646';
+        window.CLAUDEGRAVITY_CONTROL_URL = controlUrl;
+        for (const dictionary of Object.values(window.translations || {})) {
+          dictionary.systemName = 'ClaudeGravity';
+          dictionary.systemDesc = 'LOCAL AI GATEWAY';
+        }
+
+        async function action(name) {
+          const response = await fetch(\`${'${controlUrl}'}/action/\${name}\`, { method: 'POST' });
+          if (!response.ok) throw new Error(\`ClaudeGravity action failed: \${name}\`);
+          return response.json();
+        }
+
+        window.ClaudeGravity = {
+          openClaude: () => action('open-claude').catch(console.error),
+          restart: () => action('restart').catch(console.error),
+          stop: () => {
+            if (window.confirm('Stop ClaudeGravity and restore Claude Desktop settings?')) {
+              action('stop').catch(console.error);
+            }
+          },
+        };
+
+        async function refreshGatewayStatus() {
+          const label = document.getElementById('claudegravity-gateway-status');
+          if (!label) return;
+          try {
+            const response = await fetch(\`${'${controlUrl}'}/health\`, { cache: 'no-store' });
+            const status = await response.json();
+            if (status.ready) {
+              label.textContent = 'READY';
+              label.className = 'font-bold text-emerald-400';
+            } else if (status.proxyReady || status.gatewayReady) {
+              label.textContent = 'STARTING';
+              label.className = 'font-bold text-yellow-400';
+            } else {
+              label.textContent = 'OFFLINE';
+              label.className = 'font-bold text-red-400';
+            }
+          } catch {
+            label.textContent = 'OFFLINE';
+            label.className = 'font-bold text-red-400';
+          }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+          refreshGatewayStatus();
+          window.setInterval(refreshGatewayStatus, 2500);
+        });
+      })();
+    </script>
+    <!-- 2. Alpine Stores (register alpine:init listeners) -->`;
+    index = index.replace('    <!-- 2. Alpine Stores (register alpine:init listeners) -->', controlScript);
+    files.set(indexName, index);
+    changed = true;
+    webUiChanged = true;
+  }
+
+  const logsName = "public/js/components/logs-viewer.js";
+  let logs = await load(logsName);
+  if (!logs.includes('window.CLAUDEGRAVITY_CONTROL_URL')) {
+    const before = `        const password = Alpine.store('global').webuiPassword;
+        const url = password
+            ? \`/api/logs/stream?history=true&password=\${encodeURIComponent(password)}\`
+            : '/api/logs/stream?history=true';`;
+    const after = `        // ClaudeGravity streams both Antigravity and Relay output from the
+        // background supervisor instead of dumping child stdout/stderr to a terminal.
+        const controlUrl = window.CLAUDEGRAVITY_CONTROL_URL || 'http://127.0.0.1:17646';
+        const url = \`\${controlUrl}/logs/stream?history=true\`;`;
+    if (logs.split(before).length - 1 !== 1) {
+      throw new Error(`${logsName}: expected one upstream log-stream block`);
+    }
+    logs = logs.replace(before, after);
+    files.set(logsName, logs);
+    changed = true;
+    webUiChanged = true;
+  }
+
+  return webUiChanged;
+};
+
 const writeChanges = async () => {
   if (!changed) return;
   for (const [name, content] of files) {
@@ -143,6 +271,7 @@ const constants = await load("src/constants.js");
 const requestBuilder = await load("src/cloudcode/request-builder.js");
 const modelApi = await load("src/cloudcode/model-api.js");
 const smartDnsChanged = await patchSmartDns();
+const webUiChanged = await patchWebUi();
 
 const hasNative28Protocol =
   constants.includes("antigravity/hub/") &&
@@ -157,6 +286,9 @@ if (hasNative28Protocol && !constants.includes("ClaudeGravity Antigravity 2.8 co
   console.log(smartDnsChanged
     ? "Applied ClaudeGravity selective Smart DNS routing."
     : "ClaudeGravity selective Smart DNS routing is already applied.");
+  console.log(webUiChanged
+    ? "Applied ClaudeGravity WebUI branding and background log bridge."
+    : "ClaudeGravity WebUI branding is already applied.");
   process.exit(0);
 }
 
@@ -320,3 +452,6 @@ console.log(changed
 console.log(smartDnsChanged
   ? "Applied ClaudeGravity selective Smart DNS routing."
   : "ClaudeGravity selective Smart DNS routing is already applied.");
+console.log(webUiChanged
+  ? "Applied ClaudeGravity WebUI branding and background log bridge."
+  : "ClaudeGravity WebUI branding is already applied.");
