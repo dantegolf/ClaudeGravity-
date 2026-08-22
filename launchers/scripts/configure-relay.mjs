@@ -4,7 +4,11 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const relayHome = process.argv[2];
-if (!relayHome) throw new Error("Usage: configure-relay.mjs <relay-home>");
+const antigravityBaseUrl = process.argv[3] || process.env.CLAUDEGRAVITY_ANTIGRAVITY_URL || "http://127.0.0.1:18080";
+if (!relayHome) throw new Error("Usage: configure-relay.mjs <relay-home> [antigravity-base-url]");
+if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(antigravityBaseUrl)) {
+  throw new Error("Antigravity base URL must be a loopback http://127.0.0.1:<port> address.");
+}
 
 const modelIds = [
   "gemini-3.6-flash-high",
@@ -49,7 +53,7 @@ const models = modelIds.map((id) => ({
   contextWindow: id === "gemini-2.5-pro" ? 2_000_000 : 1_000_000,
   modelFormat: "anthropic",
   npm: "@ai-sdk/anthropic",
-  apiUrl: "http://127.0.0.1:8080",
+  apiUrl: antigravityBaseUrl,
 }));
 
 const antigravityProvider = {
@@ -60,7 +64,7 @@ const antigravityProvider = {
   authRef: "keyring:provider:custom-antigravity",
   addedAt: stamp,
   refreshedAt: stamp,
-  api: { npm: "@ai-sdk/anthropic", url: "http://127.0.0.1:8080" },
+  api: { npm: "@ai-sdk/anthropic", url: antigravityBaseUrl },
   modelsCache: { fetchedAt: stamp, models },
 };
 
@@ -82,8 +86,9 @@ function validProvider(provider) {
     && provider.templateId === "custom-anthropic"
     && provider.enabled === true
     && provider.authRef === "keyring:provider:custom-antigravity"
-    && provider.api?.url === "http://127.0.0.1:8080"
+    && provider.api?.url === antigravityBaseUrl
     && provider.modelsCache?.models?.length === modelIds.length
+    && provider.modelsCache.models.every((model) => model.apiUrl === antigravityBaseUrl)
     && modelIds.every((id) => provider.modelsCache.models.some((model) => model.id === id));
 }
 
@@ -123,4 +128,4 @@ if (preferences.claudeGravityFavoritesVersion !== 2) {
   writeJson(configPath, preferences);
 }
 
-console.log(`Relay AI configured: ${models.length} models, ${defaultFavorites.length} defaults.`);
+console.log(`Relay AI configured: ${models.length} models, ${defaultFavorites.length} defaults, upstream ${antigravityBaseUrl}.`);
