@@ -41,6 +41,23 @@ async function waitFor(url, attempts = 40) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
+async function waitForDesktopActivation(attempts = 40) {
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const meta = JSON.parse(readFileSync(originalMetaPath, 'utf8'));
+      if (
+        meta.appliedId
+        && meta.appliedId !== 'before'
+        && output.includes('Local endpoint: http://127.0.0.1:17645/anthropic')
+      ) {
+        return meta;
+      }
+    } catch { /* retry until supervisor finishes activation */ }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  throw new Error(`Claude Desktop gateway config was not activated. Output:\n${output}`);
+}
+
 async function waitClosed(url, attempts = 30) {
   for (let i = 0; i < attempts; i += 1) {
     try {
@@ -127,15 +144,10 @@ try {
   const models = await request('http://127.0.0.1:17645/anthropic/v1/models');
   if (models.status !== 200 || !models.body.includes('masked-model')) throw new Error('Anthropic model discovery is not exposed on the unified gateway');
 
-  const activeMeta = JSON.parse(readFileSync(originalMetaPath, 'utf8'));
-  if (activeMeta.appliedId === 'before') throw new Error('Claude Desktop gateway config was not activated');
+  const activeMeta = await waitForDesktopActivation();
   const activeConfig = JSON.parse(readFileSync(join(desktopHome, 'configLibrary', `${activeMeta.appliedId}.json`), 'utf8'));
   if (activeConfig.inferenceGatewayBaseUrl !== 'http://127.0.0.1:17645/anthropic') {
     throw new Error('Claude Desktop is not pointed at the unified public gateway');
-  }
-
-  if (!output.includes('Local endpoint: http://127.0.0.1:17645/anthropic')) {
-    throw new Error(`Supervisor did not advertise the unified endpoint. Output:\n${output}`);
   }
 
   supervisor.kill('SIGTERM');
