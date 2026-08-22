@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 function Parse-Script($Path) {
   $tokens = $null
@@ -16,6 +16,9 @@ $root = Split-Path $PSScriptRoot -Parent
 $installerPath = Join-Path $root "install-windows.ps1"
 $launcherPath = Join-Path $root "distribution\runtime\ClaudeGravity.ps1"
 $limitsPath = Join-Path $root "distribution\runtime\Check-Limits.ps1"
+$supervisorPath = Join-Path $root "launchers\scripts\supervisor.mjs"
+$desktopConfigPath = Join-Path $root "launchers\scripts\configure-claude-desktop.mjs"
+$configureRelayPath = Join-Path $root "launchers\scripts\configure-relay.mjs"
 
 $installerBytes = [System.IO.File]::ReadAllBytes($installerPath)
 if ($installerBytes.Count -ge 3 -and $installerBytes[0] -eq 0xEF -and $installerBytes[1] -eq 0xBB -and $installerBytes[2] -eq 0xBF) {
@@ -24,7 +27,10 @@ if ($installerBytes.Count -ge 3 -and $installerBytes[0] -eq 0xEF -and $installer
 
 $installer = Parse-Script $installerPath
 $launcher = Parse-Script $launcherPath
-Parse-Script $limitsPath | Out-Null
+$limits = Parse-Script $limitsPath
+$supervisor = Get-Content -LiteralPath $supervisorPath -Raw
+$desktopConfig = Get-Content -LiteralPath $desktopConfigPath -Raw
+$configureRelay = Get-Content -LiteralPath $configureRelayPath -Raw
 
 foreach ($required in @(
   'dantegolf/ClaudeGravity-/releases/latest/download',
@@ -63,22 +69,51 @@ foreach ($forbidden in @('olegsuper338-lgtm', 'npm.cmd', '@latest', 'npm install
   }
 }
 
-foreach ($required in @(
-  'node_modules\antigravity-claude-proxy',
-  'node_modules\@jacobbd\relay-ai',
-  'patch-antigravity-proxy.mjs',
-  'configure-relay.mjs',
-  'ClaudeGravity готов'
-)) {
+foreach ($required in @('supervisor.mjs', 'RELAY_AI_HOME', 'ANTIGRAVITY_API_KEY')) {
   if ($launcher -notmatch [regex]::Escape($required)) {
-    throw "Missing bundled launcher safeguard: $required"
+    throw "Missing unified launcher safeguard: $required"
+  }
+}
+foreach ($forbidden in @('claude-app', 'http://127.0.0.1:8080', 'npm install', 'acc.cmd', 'relay-ai.cmd')) {
+  if ($launcher -match [regex]::Escape($forbidden)) {
+    throw "Legacy launcher path remains: $forbidden"
   }
 }
 
-foreach ($forbidden in @('npm install', 'acc.cmd', 'relay-ai.cmd')) {
-  if ($launcher -match [regex]::Escape($forbidden)) {
-    throw "Bundled launcher still depends on a global command: $forbidden"
+foreach ($required in @(
+  '18080',
+  '17645',
+  'HOST: ''127.0.0.1''',
+  '''server''',
+  '''--quick''',
+  '''custom-antigravity''',
+  '''--mask-gateway-ids''',
+  'applyClaudeDesktopConfig',
+  'restoreClaudeDesktopConfig'
+)) {
+  if ($supervisor -notmatch [regex]::Escape($required)) {
+    throw "Missing supervisor safeguard: $required"
   }
+}
+if ($supervisor -match [regex]::Escape("'claude-app'")) {
+  throw 'Unified supervisor must not launch Relay claude-app because it creates a second public proxy.'
+}
+
+if ($configureRelay -notmatch [regex]::Escape('http://127.0.0.1:18080')) {
+  throw 'Relay provider must default to the internal Antigravity port.'
+}
+if ($desktopConfig -notmatch [regex]::Escape('http://127.0.0.1:${port}/anthropic')) {
+  throw 'Claude Desktop config must target the Relay gateway endpoint.'
+}
+foreach ($required in @('http://127.0.0.1:17645/health', 'http://127.0.0.1:18080/account-limits')) {
+  if ($limits -notmatch [regex]::Escape($required)) {
+    throw "Limits helper is not wired to the unified gateway: $required"
+  }
+}
+
+foreach ($script in @($supervisorPath, $desktopConfigPath, $configureRelayPath)) {
+  & node.exe --check $script
+  if ($LASTEXITCODE -ne 0) { throw "Node syntax check failed: $script" }
 }
 
 Write-Host "Windows bundled distribution checks passed."
