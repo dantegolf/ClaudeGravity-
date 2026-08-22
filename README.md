@@ -5,7 +5,7 @@
 <h1 align="center">ClaudeGravity</h1>
 
 <p align="center">
-  Gemini и Claude в Claude Desktop через локальный Antigravity proxy и Relay AI.
+  Gemini и Claude в Claude Desktop через один локальный ClaudeGravity gateway.
 </p>
 
 <p align="center">
@@ -13,7 +13,9 @@
   <a href="https://github.com/dantegolf/ClaudeGravity-/actions/workflows/distribution.yml"><img alt="Distribution" src="https://github.com/dantegolf/ClaudeGravity-/actions/workflows/distribution.yml/badge.svg"></a>
 </p>
 
-ClaudeGravity настраивает Claude Desktop для работы с моделями Google Antigravity через локальный proxy. Proxy и Relay AI поставляются вместе с релизом проекта: во время обычной установки они не подтягиваются через `npm @latest` и не устанавливаются глобально.
+ClaudeGravity настраивает Claude Desktop для работы с моделями Google Antigravity. Внутри используются pinned Antigravity proxy и Relay AI, но ClaudeGravity сам запускает и контролирует оба процесса: наружу остаётся одна точка входа `http://127.0.0.1:17645/anthropic`.
+
+Proxy и Relay AI поставляются вместе с релизом проекта: во время обычной установки они не подтягиваются через `npm @latest` и не устанавливаются глобально.
 
 Поддерживаются Windows, macOS и Linux.
 
@@ -46,6 +48,8 @@ irm https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-wind
 Документы\ClaudeGravity
 ```
 
+После установки на рабочем столе создаются ярлыки `ClaudeGravity` и `Check-Limits`.
+
 ### macOS
 
 Откройте **Terminal** и выполните:
@@ -59,6 +63,8 @@ irm https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-wind
 ```text
 ~/Documents/ClaudeGravity
 ```
+
+На рабочем столе создаются `ClaudeGravity.command` и `Check-Limits.command`, пригодные для запуска двойным кликом.
 
 Если Node.js не установлен, скрипт может поставить его через Homebrew, если `brew` уже есть в системе.
 
@@ -79,21 +85,34 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-
 | Платформа | Запуск | Проверка состояния |
 |---|---|---|
 | Windows | `Документы\ClaudeGravity\ClaudeGravity.cmd` | `Check-Limits.cmd` |
-| macOS | `~/Documents/ClaudeGravity/ClaudeGravity.sh` | `Check-Limits.sh` |
+| macOS | `~/Documents/ClaudeGravity/ClaudeGravity.command` | `Check-Limits.command` |
 | Linux | `~/ClaudeGravity/ClaudeGravity.sh` | `Check-Limits.sh` |
 
 При запуске ClaudeGravity:
 
-1. проверяет локальный runtime;
+1. проверяет bundled runtime и compatibility patch;
 2. добавляет Antigravity provider в конфигурацию Relay AI, не удаляя другие пользовательские провайдеры;
 3. при необходимости предлагает войти в Google через OAuth;
-4. запускает Antigravity proxy на `127.0.0.1:8080`;
-5. ждёт ответа от proxy;
-6. запускает Relay AI для Claude Desktop.
+4. останавливает старый detached Antigravity process от предыдущих версий ClaudeGravity;
+5. запускает внутренний Antigravity engine только на `127.0.0.1:18080`;
+6. запускает единственный внешний gateway Relay AI на `127.0.0.1:17645`;
+7. временно направляет Claude Desktop на `http://127.0.0.1:17645/anthropic` и открывает Claude Desktop.
 
-После этого откройте Claude Desktop, переключитесь в режим **Code** и выберите модель.
+Пользователю не нужно отдельно запускать Relay AI или Antigravity proxy и не нужно знать их команды. Оба процесса принадлежат одному ClaudeGravity supervisor и завершаются вместе с ним.
 
-Окно или Terminal с запущенным ClaudeGravity закрывать не нужно: пока оно работает, работает и локальный gateway.
+После запуска переключитесь в Claude Desktop в режим **Code** и выберите модель.
+
+Окно или Terminal с запущенным ClaudeGravity закрывать не нужно: пока оно работает, работает и локальный gateway. При штатной остановке ClaudeGravity восстанавливает предыдущую конфигурацию Claude Desktop; после аварийного завершения stale-конфигурация восстанавливается при следующем запуске.
+
+## Единственный localhost endpoint
+
+Внешняя точка входа ClaudeGravity:
+
+```text
+http://127.0.0.1:17645/anthropic
+```
+
+Внутренний Antigravity endpoint `127.0.0.1:18080` используется только самим ClaudeGravity/Relay AI и bind'ится на loopback. Старый пользовательский proxy на `:8080` больше не является частью схемы запуска.
 
 ## Модели
 
@@ -115,10 +134,15 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-
 Claude Desktop
       │
       ▼
-Relay AI
+ClaudeGravity public gateway
+127.0.0.1:17645/anthropic
       │
       ▼
-Antigravity proxy
+Relay AI (managed engine)
+      │
+      ▼
+Antigravity proxy (managed internal engine)
+127.0.0.1:18080
       │
       ├── OAuth и обычные домены ──→ системный DNS
       │
@@ -127,6 +151,8 @@ Antigravity proxy
                                       ▼
                                   Google APIs
 ```
+
+Один `supervisor.mjs` управляет жизненным циклом Relay AI и Antigravity proxy: запускает их, ждёт readiness, применяет временную конфигурацию Claude Desktop и при завершении останавливает оба child process.
 
 Proxy и Relay AI заранее собираются в GitHub Actions и попадают в `ClaudeGravity-runtime.zip` и `ClaudeGravity-runtime.tar.gz`.
 
@@ -181,17 +207,22 @@ CLAUDEGRAVITY_SMART_DNS_SERVERS=111.88.96.50,111.88.96.51
 
 Установщик заменит каталог ClaudeGravity свежим runtime из последнего GitHub Release. Настройки Relay AI и данные Google OAuth хранятся отдельно и при обычной переустановке не удаляются.
 
+После успешного push в `main` workflow **Distribution** автоматически собирает и публикует свежий runtime release, поэтому `releases/latest/download` соответствует актуальной версии `main`. Ручные релизы через пользовательские `v*`-теги также поддерживаются.
+
 ## Проверки
 
 В репозитории работают два GitHub Actions workflow:
 
 - **Installers** — проверяет Windows PowerShell 5.1, PowerShell 7, macOS и Ubuntu;
-- **Distribution** — собирает runtime, проверяет его содержимое и создаёт ZIP/tar.gz архивы.
+- **Distribution** — собирает реальный pinned runtime, проверяет его содержимое, создаёт ZIP/tar.gz и публикует свежий release после успешного push в `main`.
+
+Дополнительно `tests/unified-gateway.mjs` проверяет жизненный цикл единого gateway: внутренний порт `18080`, внешний `17645`, model discovery, временную конфигурацию Claude Desktop и cleanup обоих процессов.
 
 Основные проверки, которые можно запустить локально:
 
 ```bash
 node tests/distribution.mjs
+node tests/unified-gateway.mjs
 bash tests/unix-installer.sh
 ```
 
@@ -225,9 +256,9 @@ ClaudeGravity-runtime.tar.gz
 3. ClaudeGravity всё ещё запущен;
 4. Claude Desktop был перезапущен после установки или обновления.
 
-### `Check-Limits` сообщает, что proxy не запущен
+### `Check-Limits` сообщает, что gateway не запущен
 
-Сначала запустите основной ClaudeGravity launcher. `Check-Limits` только проверяет локальный endpoint `http://127.0.0.1:8080/health` и сам proxy не запускает.
+Сначала запустите основной ClaudeGravity launcher. `Check-Limits` проверяет внешний gateway `http://127.0.0.1:17645/health`, затем получает квоты из внутреннего Antigravity endpoint `http://127.0.0.1:18080/account-limits`. Сам gateway `Check-Limits` не запускает.
 
 ### `User location is not supported for the API use`
 
@@ -256,7 +287,7 @@ node tests/distribution.mjs dist/ClaudeGravity
 
 Сборщик устанавливает версии из `distribution/manifest.json` в отдельный runtime-каталог, применяет compatibility/Smart DNS patch и проверяет результат перед упаковкой.
 
-Workflow `.github/workflows/distribution.yml` запускается на push и pull request. При создании тега `v*` он публикует:
+Workflow `.github/workflows/distribution.yml` запускается на push и pull request. После успешного push в `main` он автоматически публикует:
 
 ```text
 ClaudeGravity-runtime.zip
