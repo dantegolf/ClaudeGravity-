@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/banner.png" alt="ClaudeGravity — Gemini и Claude в Claude Desktop" width="100%">
+  <img src="assets/banner.png" alt="ClaudeGravity — локальный gateway для Claude Desktop" width="100%">
 </p>
 
 <h1 align="center">ClaudeGravity</h1>
 
 <p align="center">
-  Gemini и Claude в Claude Desktop через локальный ClaudeGravity gateway и WebUI.
+  <strong>Локальный managed gateway для Claude Desktop с Google Antigravity, WebUI и воспроизводимым bundled runtime.</strong>
 </p>
 
 <p align="center">
@@ -13,15 +13,24 @@
   <a href="https://github.com/dantegolf/ClaudeGravity-/actions/workflows/distribution.yml"><img alt="Distribution" src="https://github.com/dantegolf/ClaudeGravity-/actions/workflows/distribution.yml/badge.svg"></a>
 </p>
 
-ClaudeGravity настраивает Claude Desktop для работы с моделями Google Antigravity. Внутри используются pinned Antigravity proxy и Relay AI, но пользователю не нужно запускать их отдельно или работать с их CLI.
+<p align="center">
+  <a href="#возможности">Возможности</a> ·
+  <a href="#установка">Установка</a> ·
+  <a href="#архитектура">Архитектура</a> ·
+  <a href="#webui">WebUI</a> ·
+  <a href="#cg-agent">CG-Agent</a> ·
+  <a href="#диагностика">Диагностика</a>
+</p>
 
-После запуска ClaudeGravity работает в фоне и автоматически открывает локальный интерфейс:
+ClaudeGravity объединяет Claude Desktop, Relay AI и Antigravity Proxy в один управляемый локальный runtime. Пользователю не нужно отдельно устанавливать или запускать engine-компоненты: проект собирает проверенный bundle в GitHub Actions, запускает процессы через собственный supervisor и предоставляет один Anthropic-compatible endpoint для Claude Desktop.
+
+После запуска ClaudeGravity работает в фоне и открывает локальный WebUI:
 
 ```text
 http://127.0.0.1:18080/
 ```
 
-Основной Anthropic-compatible endpoint для Claude Desktop остаётся один:
+Claude Desktop подключается к единой внешней точке входа:
 
 ```text
 http://127.0.0.1:17645/anthropic
@@ -29,185 +38,210 @@ http://127.0.0.1:17645/anthropic
 
 Поддерживаются Windows, macOS и Linux.
 
+> [!IMPORTANT]
+> ClaudeGravity — независимый неофициальный проект. Он не связан с Anthropic, Google, Relay AI или авторами Antigravity Proxy. Доступ к моделям, OAuth, квотам и API определяется сторонними сервисами и может меняться независимо от ClaudeGravity.
+
 > [!CAUTION]
-> Проект использует неофициальную интеграцию и не связан с Anthropic или Google. Доступ к Google Antigravity зависит от аккаунта, региона, сети и текущих ограничений со стороны Google. Для тестов разумнее использовать отдельный Google-аккаунт.
+> Интеграция использует неофициальный путь доступа к Google Antigravity. Перед использованием оцените риски для аккаунта, региона и сети. Для экспериментов разумно использовать отдельный Google-аккаунт.
 
-## Что теперь происходит при запуске
+## Возможности
 
-ClaudeGravity больше не требует постоянно открытого Terminal или PowerShell.
+- **Один managed runtime.** Antigravity Proxy и Relay AI запускаются и останавливаются одним ClaudeGravity supervisor.
+- **Один endpoint для Claude Desktop.** Публичная локальная точка входа — `127.0.0.1:17645/anthropic`.
+- **Локальный WebUI.** Статус, аккаунты, модели, квоты, live-логи и lifecycle actions доступны в браузере.
+- **Фоновый запуск.** На Windows и macOS обычная работа не требует постоянно открытого PowerShell или Terminal.
+- **Восстановление Claude Desktop config.** Предыдущая конфигурация сохраняется и восстанавливается при штатной остановке; stale-состояние обрабатывается при следующем запуске.
+- **Pinned distribution.** Пользователь получает заранее собранный runtime вместо установки случайных `npm @latest` версий.
+- **Selective Smart DNS.** Отдельный resolver применяется только к выбранным Antigravity / Cloud Code API-хостам и не меняет системный DNS.
+- **Cross-platform CI.** Инсталляторы, runtime bundle, lifecycle supervisor и compatibility patch проверяются в GitHub Actions.
+- **CG-Agent.** Опциональный Gemini coding worker для делегирования реализации под контролем внешнего supervisor.
 
-Supervisor:
+## Как это работает
+
+При обычном запуске ClaudeGravity:
 
 1. проверяет bundled runtime и compatibility patch;
-2. останавливает старый detached proxy от предыдущих версий;
+2. убирает legacy detached-процессы предыдущих версий;
 3. запускает внутренний Antigravity engine на `127.0.0.1:18080`;
 4. запускает Relay AI gateway на `127.0.0.1:17645`;
-5. временно настраивает Claude Desktop на `http://127.0.0.1:17645/anthropic`;
-6. открывает Claude Desktop;
-7. открывает ClaudeGravity WebUI в браузере;
-8. работает в фоне, пока пользователь не нажмёт **Stop** в WebUI.
+5. временно направляет Claude Desktop на `http://127.0.0.1:17645/anthropic`;
+6. поднимает control API на `127.0.0.1:17646`;
+7. открывает Claude Desktop и локальный WebUI;
+8. собирает stdout/stderr обоих engine’ов в общий лог вместо вывода в пользовательский терминал.
 
-stdout/stderr обоих engines больше не выводятся в терминал. Они объединяются в WebUI **Logs** и сохраняются в:
-
-```text
-~/.claudegravity/claudegravity.log
-```
-
-На Windows это соответствует `%USERPROFILE%\.claudegravity\claudegravity.log`.
-
-## WebUI
-
-Интерфейс основан на bundled WebUI Antigravity Proxy, но патчится при сборке под ClaudeGravity: название, `CG` badge, cyan/violet accents и собственные controls.
-
-В интерфейсе доступны:
-
-- **Dashboard** — состояние аккаунтов и квот;
-- **Models** — доступные модели;
-- **Accounts** — добавление и управление Google-аккаунтами через OAuth;
-- **Logs** — объединённые live-логи Antigravity + Relay;
-- **Settings** — настройки engine;
-- **Open Claude** — открыть Claude Desktop;
-- **Restart** — перезапустить оба managed engine;
-- **Stop** — корректно остановить ClaudeGravity и восстановить предыдущую конфигурацию Claude Desktop.
-
-В верхней панели отображается отдельный статус ClaudeGravity gateway: `STARTING`, `READY` или `OFFLINE`.
-
-Повторный запуск ClaudeGravity не создаёт второй proxy/supervisor. Уже запущенный экземпляр обнаруживается автоматически, после чего просто открывается существующий WebUI и Claude Desktop.
+Повторный запуск не создаёт второй экземпляр supervisor: уже работающий ClaudeGravity обнаруживается автоматически, после чего открываются существующие WebUI и Claude Desktop.
 
 ## Установка
 
+### Требования
+
 Перед установкой:
 
-1. Установите [Claude Desktop](https://claude.ai/download).
-2. В Claude Desktop включите **Help → Troubleshooting → Enable Developer Mode**.
-3. Убедитесь, что установлен **Node.js 18 или новее**.
+1. установите [Claude Desktop](https://claude.ai/download);
+2. в Claude Desktop включите **Help → Troubleshooting → Enable Developer Mode**;
+3. убедитесь, что установлен **Node.js 18+**.
 
-Менять DNS всей системы не требуется. ClaudeGravity использует отдельный resolver только для нескольких Antigravity / Cloud Code API-хостов.
+Основные engine-зависимости отдельно через npm устанавливать не требуется — они входят в release bundle ClaudeGravity.
 
 ### Windows
 
-Откройте обычный **Windows PowerShell** и выполните:
+Откройте обычный **Windows PowerShell**:
 
 ```powershell
 irm https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-windows.ps1 | iex
 ```
 
-Установка выполняется в:
+Runtime устанавливается в пользовательский каталог `Documents\ClaudeGravity`.
 
-```text
-Документы\ClaudeGravity
-```
+После установки создаются ярлыки:
 
-На рабочем столе создаётся ярлык **ClaudeGravity**. Он запускает background supervisor через скрытое окно PowerShell, поэтому после установки терминал для обычной работы не нужен.
+- **ClaudeGravity** — запускает background supervisor через скрытое окно PowerShell;
+- **Check-Limits** — проверяет состояние gateway и квоты.
 
-Также создаётся `Check-Limits` для отдельной диагностики.
+Установщик предпочитает системные `curl.exe` и `tar.exe`, сохраняя PowerShell-compatible fallback для загрузки и распаковки.
 
 ### macOS
 
-Откройте **Terminal** только для установки и выполните:
+Откройте **Terminal** только для установки:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-macos.sh)"
 ```
 
-Файлы устанавливаются в:
+Runtime устанавливается в:
 
 ```text
 ~/Documents/ClaudeGravity
 ```
 
-На рабочем столе создаётся **ClaudeGravity.app** — небольшой системный launcher, собранный через macOS `osacompile`. Он запускает background supervisor без Terminal.
-
-В каталоге установки также остаётся `ClaudeGravity.command` как fallback для ручной диагностики, а на Desktop создаётся `Check-Limits.command`.
+На Desktop создаётся **ClaudeGravity.app**, собранный через системный `osacompile`. Он запускает supervisor без постоянного окна Terminal. В каталоге установки остаётся `.command`-launcher для ручной диагностики.
 
 ### Linux
-
-Откройте терминал и выполните:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-linux.sh)"
 ```
 
-Поддерживаются `apt`, `dnf`, `pacman` и `zypper`. Права `sudo` нужны только если требуется установить Node.js или `curl`. Сам ClaudeGravity устанавливается в пользовательский каталог.
+Поддерживаются `apt`, `dnf`, `pacman` и `zypper`. `sudo` используется только если системе требуется установить Node.js или `curl`; сам ClaudeGravity устанавливается в пользовательский каталог.
 
-`ClaudeGravity.sh` запускает supervisor через `nohup` и сразу возвращает управление терминалу.
+`ClaudeGravity.sh` запускает supervisor через `nohup` и возвращает управление терминалу.
 
-## Первый запуск и Google OAuth
+## Первый запуск
 
-При отсутствии Google-аккаунта ClaudeGravity больше не блокирует скрытый background process терминальным prompt.
+После запуска дождитесь статуса **READY** в WebUI.
 
-Откройте вкладку **Accounts** в WebUI и добавьте аккаунт через OAuth. После авторизации Dashboard покажет состояние аккаунта и квоты.
+Если Google-аккаунт ещё не добавлен:
 
-После этого используйте Claude Desktop в режиме **Code** и выбирайте нужную модель.
+1. откройте вкладку **Accounts**;
+2. запустите OAuth-вход;
+3. после авторизации проверьте состояние аккаунта и квоты на Dashboard;
+4. откройте Claude Desktop, включите режим **Code** и выберите доступную модель.
 
-## Сетевые адреса
+Доступность конкретных model ID и квот определяется Google и вашим аккаунтом. Наличие модели в локальном registry не гарантирует её доступность на стороне сервиса.
 
-| Назначение | Адрес |
+## WebUI
+
+ClaudeGravity использует WebUI bundled Antigravity Proxy, который патчится при сборке под интерфейс ClaudeGravity.
+
+Основные разделы:
+
+| Раздел | Назначение |
 |---|---|
-| ClaudeGravity WebUI / internal Antigravity | `http://127.0.0.1:18080/` |
-| Public Anthropic gateway | `http://127.0.0.1:17645/anthropic` |
-| Supervisor control API | `http://127.0.0.1:17646` |
+| **Dashboard** | состояние runtime, аккаунтов и квот |
+| **Models** | модели, доступные через engine |
+| **Accounts** | Google OAuth и управление аккаунтами |
+| **Logs** | live-поток объединённых логов Antigravity + Relay |
+| **Settings** | настройки engine |
 
-Все три сервиса bind'ятся только на loopback. Порт `17646` используется WebUI для status/actions/live logs и не предназначен для внешней сети.
+В верхней панели доступны lifecycle actions:
 
-Старый пользовательский proxy на `:8080` больше не является частью схемы запуска.
+- **Open Claude** — открыть Claude Desktop;
+- **Restart** — перезапустить managed engine-процессы;
+- **Stop** — корректно остановить ClaudeGravity и восстановить предыдущую конфигурацию Claude Desktop.
+
+Общий disk log хранится в:
+
+```text
+~/.claudegravity/claudegravity.log
+```
+
+На Windows:
+
+```text
+%USERPROFILE%\.claudegravity\claudegravity.log
+```
 
 ## Архитектура
 
 ```text
-Browser
-  │
-  └── ClaudeGravity WebUI ────────────────┐
-      127.0.0.1:18080                    │
-                                          ▼
-Claude Desktop                     ClaudeGravity supervisor
-      │                            control: 127.0.0.1:17646
-      ▼                                   │
-127.0.0.1:17645/anthropic                 ├── logs / status / actions
-      │                                   ├── Open Claude
-      ▼                                   ├── Restart
-Relay AI                                  └── Stop + restore config
-      │
-      ▼
-Antigravity proxy
-127.0.0.1:18080
-      │
-      ├── OAuth и обычные домены ──→ системный DNS
-      │
-      └── Cloud Code API ──────────→ selective Smart DNS
-                                      │
-                                      ▼
-                                  Google APIs
+                         ┌──────────────────────────────┐
+                         │     ClaudeGravity WebUI      │
+                         │     127.0.0.1:18080          │
+                         └──────────────┬───────────────┘
+                                        │ status / logs / actions
+                                        ▼
+┌────────────────┐             ┌─────────────────────────┐
+│ Claude Desktop │             │ ClaudeGravity supervisor│
+└───────┬────────┘             │ control: 127.0.0.1:17646│
+        │                      └────────────┬────────────┘
+        │ Anthropic API                     │ owns lifecycle
+        ▼                                   │
+127.0.0.1:17645/anthropic                  │
+        │                                   │
+        ▼                                   │
+┌────────────────┐                          │
+│    Relay AI    │◄─────────────────────────┘
+└───────┬────────┘
+        │
+        ▼
+┌──────────────────────┐
+│  Antigravity Proxy   │
+│  127.0.0.1:18080     │
+└──────────┬───────────┘
+           │
+           ├── OAuth / обычные домены ──► системный DNS
+           │
+           └── Cloud Code API ──────────► selective Smart DNS
+                                           │
+                                           ▼
+                                      Google APIs
 ```
 
-## Модели
+### Локальные порты
 
-По умолчанию в избранное Relay AI добавляются:
+| Назначение | Адрес | Доступ |
+|---|---|---|
+| WebUI + internal Antigravity engine | `127.0.0.1:18080` | loopback only |
+| Public Anthropic gateway | `127.0.0.1:17645/anthropic` | loopback only |
+| Supervisor control API | `127.0.0.1:17646` | loopback only |
 
-- Gemini 3.7 Flash High
-- Gemini 3.1 Pro High
-- Gemini 2.5 Pro
-- Claude Sonnet 4.6
-- Claude Opus 4.6 Thinking
+Старый пользовательский proxy на `:8080` не является частью текущей схемы запуска.
 
-Relay также получает дополнительные Antigravity model IDs. Наличие модели в списке не означает, что конкретный Google-аккаунт обязательно имеет к ней доступ — доступность и квоты определяются на стороне Google.
+## Bundled runtime
 
-## Bundled engines
+ClaudeGravity не полагается на `npm @latest` на машине пользователя. GitHub Actions собирает runtime из зафиксированных upstream inputs, применяет compatibility patch, выполняет тесты и упаковывает результат в release assets.
 
-Proxy и Relay AI заранее собираются в GitHub Actions и попадают в `ClaudeGravity-runtime.zip` и `ClaudeGravity-runtime.tar.gz`. На машине пользователя нет необходимости отдельно устанавливать `antigravity-claude-proxy` или Relay AI через npm.
+Текущие pinned inputs определены в [`distribution/manifest.json`](distribution/manifest.json):
 
-Текущие версии зафиксированы в `distribution/manifest.json`:
+| Компонент | Версия / ref | Лицензия |
+|---|---|---|
+| `antigravity-claude-proxy` | package `2.7.7`, source commit `055699fcebcac83cea64bf599546a3ce820ebcdb` | MIT |
+| `@jacobbd/relay-ai` | `0.9.5` | MIT |
 
-- `antigravity-claude-proxy` — commit `055699fcebcac83cea64bf599546a3ce820ebcdb` (package metadata `2.7.7`)
-- `@jacobbd/relay-ai` — `0.9.5`
+Release runtime публикуется в двух форматах:
 
-Antigravity Proxy закреплён по полному commit SHA. Его MIT WebUI сохраняется внутри bundled package и патчится ClaudeGravity во время сборки/runtime compatibility check. Условия сторонних лицензий сохраняются в `THIRD_PARTY_NOTICES.md` и bundled packages.
+```text
+ClaudeGravity-runtime.zip
+ClaudeGravity-runtime.tar.gz
+```
+
+При push в `main` workflow **Distribution** пересобирает runtime и публикует новый release; `v*` tags также создают release с соответствующим тегом.
 
 ## Selective Smart DNS
 
-ClaudeGravity не меняет системные DNS-настройки.
+ClaudeGravity не меняет DNS-настройки операционной системы.
 
-Отдельный resolver используется только для:
+Отдельный resolver применяется только к хостам, перечисленным в `distribution/manifest.json`:
 
 ```text
 cloudcode-pa.googleapis.com
@@ -216,38 +250,107 @@ generativelanguage.googleapis.com
 antigravity-unleash.goog
 ```
 
-По умолчанию:
+Текущие resolver’ы по умолчанию:
 
 ```text
 111.88.96.50
 111.88.96.51
 ```
 
-OAuth, `accounts.google.com` и остальные домены продолжают использовать системный DNS. Если отдельный resolver не отвечает, запрос возвращается к системному DNS.
+OAuth и остальные домены используют системный DNS. При недоступности отдельного resolver предусмотрен fallback на системный resolver.
 
-Отключить Smart DNS для диагностики:
+Отключить selective Smart DNS:
 
 ```bash
 CLAUDEGRAVITY_SMART_DNS=off
 ```
 
-Указать другие resolver'ы:
+Задать собственные resolver’ы:
 
 ```bash
 CLAUDEGRAVITY_SMART_DNS_SERVERS=111.88.96.50,111.88.96.51
 ```
 
+## CG-Agent
+
+CG-Agent — **опциональный developer-инструмент**, а не обязательная часть пользовательского ClaudeGravity runtime.
+
+Он запускает Gemini как implementation worker с ограниченным набором инструментов для выбранного репозитория:
+
+- `read_file`;
+- `write_file`;
+- `list_files`;
+- `search_text`;
+- `shell`.
+
+CG-Agent работает через уже запущенный managed Antigravity engine на `127.0.0.1:18080`; он намеренно **не запускает `acc` и не создаёт второй proxy-процесс**.
+
+Команды публикации и наиболее разрушительные git-операции блокируются внутри worker runtime: `git commit`, `git push`, `git reset --hard` и force-clean должны оставаться под контролем внешнего supervisor или разработчика.
+
+### Установка CG-Agent
+
+Сначала установите и запустите обычный ClaudeGravity, затем дождитесь **READY** в WebUI.
+
+Windows:
+
+```powershell
+irm https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-cg-agent.ps1 | iex
+```
+
+macOS / Linux:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main/install-cg-agent.sh)"
+```
+
+Пример запуска:
+
+```bash
+CG-Agent.sh --repo /path/to/project --task "Проверь архитектуру и реализуй задачу"
+```
+
+Windows:
+
+```powershell
+CG-Agent.cmd --repo C:\Projects\app --task "Проверь архитектуру и реализуй задачу"
+```
+
+Для длинных заданий можно использовать `--task-file`.
+
+> [!NOTE]
+> Отчёт worker’а не заменяет review. После выполнения задачи независимо проверьте `git diff`, `git status`, тесты, lint/typecheck/build и только затем принимайте изменения.
+
+## Безопасность и границы доверия
+
+ClaudeGravity старается держать локальную поверхность минимальной:
+
+- пользовательские сервисы bind’ятся только на loopback;
+- supervisor владеет lifecycle дочерних процессов;
+- engine stdout/stderr не выводится в скрытый launcher, а направляется в локальный log stream;
+- release bundle собирается из pinned inputs;
+- compatibility patch проходит автоматические regression checks;
+- системные DNS-настройки не изменяются.
+
+При этом ClaudeGravity не может контролировать:
+
+- изменения API и политики Google / Anthropic;
+- доступность конкретных моделей и квот;
+- блокировки аккаунтов, регионов, IP или ASN;
+- безопасность upstream-компонентов за пределами версии, зафиксированной и проверенной текущей сборкой.
+
 ## Диагностика
 
-### Проверить gateway и квоты
+### Gateway не становится READY
 
-Используйте `Check-Limits` для своей платформы. Он проверяет `http://127.0.0.1:17645/health`, затем получает квоты из `http://127.0.0.1:18080/account-limits`.
+Проверьте `Check-Limits` и файл:
 
-### Запустить supervisor в foreground
+```text
+~/.claudegravity/claudegravity.log
+```
 
-Обычный пользовательский запуск должен быть background. Для разработки/диагностики можно вернуть вывод в terminal.
+Также можно запустить supervisor в foreground.
 
-macOS/Linux:
+macOS / Linux:
 
 ```bash
 CLAUDEGRAVITY_FOREGROUND=1 ./ClaudeGravity.sh
@@ -267,44 +370,44 @@ Windows PowerShell:
 
 ### Claude Desktop не показывает модели
 
-Проверьте:
+Проверьте последовательно:
 
 1. включён **Developer Mode**;
 2. выбран режим **Code**;
-3. в WebUI статус gateway — `READY`;
-4. Google-аккаунт добавлен во вкладке **Accounts**;
-5. при необходимости нажмите **Restart** в WebUI.
+3. WebUI показывает `READY`;
+4. Google-аккаунт добавлен через **Accounts**;
+5. public gateway доступен на `127.0.0.1:17645`;
+6. при необходимости выполните **Restart** из WebUI.
 
 ### `User location is not supported for the API use`
 
-Selective Smart DNS помогает только с DNS-маршрутизацией выбранных API-хостов. Он не снимает ограничения, которые Google применяет к аккаунту или внешнему IP-адресу.
+Это ограничение upstream-сервиса. Selective Smart DNS решает только DNS-маршрутизацию выбранных API-хостов и не отменяет ограничения аккаунта, региона или внешнего IP.
 
-## Обновление
+### Повторная установка
 
-Чтобы получить последнюю опубликованную версию, повторно запустите установочную команду для своей системы.
+Чтобы обновить ClaudeGravity, повторно выполните установочную команду для своей платформы. Установщик заменит runtime свежим release bundle. Пользовательские Relay AI / OAuth данные хранятся отдельно от каталога runtime и не должны удаляться при обычном обновлении.
 
-Установщик заменит каталог ClaudeGravity свежим runtime из последнего GitHub Release. Настройки Relay AI и Google OAuth хранятся отдельно и при обычной переустановке не удаляются.
+## Проверки и CI
 
-После успешного push в `main` workflow **Distribution** автоматически собирает и публикует свежий runtime release, поэтому `releases/latest/download` соответствует актуальной версии `main`.
+Проект использует два основных workflow:
 
-## Проверки
+- **Installers** — cross-platform проверки Windows, macOS и Linux;
+- **Distribution** — source validation, сборка pinned runtime, проверка готового bundle и публикация release assets.
 
-GitHub Actions проверяет:
+Среди regression checks:
 
-- Windows PowerShell 5.1;
-- PowerShell 7;
-- macOS;
-- Ubuntu;
+- Windows PowerShell 5.1 и PowerShell 7;
+- macOS и Ubuntu installer paths;
 - Node syntax;
-- Antigravity compatibility + Smart DNS patch;
-- ClaudeGravity WebUI branding patch;
-- live-log bridge из обоих child processes;
-- отсутствие engine stdout/stderr в terminal supervisor;
+- compatibility + selective Smart DNS patch;
+- branded WebUI patch;
+- unified gateway lifecycle;
+- `17645` / `18080` / `17646` endpoint wiring;
+- live-log capture;
+- отсутствие engine output в terminal supervisor;
 - duplicate-launch handoff;
-- WebUI `Stop` lifecycle и восстановление Claude Desktop config;
-- реальную сборку pinned Antigravity + Relay runtime;
-- наличие branded WebUI внутри собранного ZIP/tar.gz;
-- компиляцию `ClaudeGravity.app` через `osacompile` на macOS CI.
+- WebUI Stop + восстановление Claude Desktop config;
+- наличие необходимых runtime-файлов внутри итогового ZIP/tar.gz.
 
 Основные локальные проверки:
 
@@ -314,28 +417,44 @@ node tests/unified-gateway.mjs
 bash tests/unix-installer.sh
 ```
 
-## Для разработчиков
-
-Собрать runtime:
+Сборка runtime вручную:
 
 ```bash
 node distribution/build-runtime.mjs
 node tests/distribution.mjs dist/ClaudeGravity
 ```
 
-Runtime build содержит:
+## Структура репозитория
 
 ```text
-ClaudeGravity-runtime.zip
-ClaudeGravity-runtime.tar.gz
+.github/workflows/       CI и release automation
+distribution/            manifest и сборка bundled runtime
+docs/                    дополнительная документация
+launchers/                пользовательские и developer launchers
+launchers/scripts/        supervisor, patch/config helpers, CG-Agent
+tests/                    integration и installer regression tests
+install-windows.ps1       Windows installer
+install-macos.sh          macOS installer
+install-linux.sh          Linux installer
+install-cg-agent.*        опциональный CG-Agent installer
+THIRD_PARTY_NOTICES.md    сведения о сторонних компонентах
 ```
 
-Именно эти файлы скачивают установщики Windows, macOS и Linux через `releases/latest/download`.
+## Для разработчиков
 
-## Лицензии и ответственность
+Изменения в runtime-архитектуре желательно сопровождать тестом на соответствующем уровне:
 
-Лицензии сторонних компонентов сохраняются внутри `runtime/node_modules`. Дополнительная информация находится в [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+- launcher / installer behavior → installer tests;
+- lifecycle / ports / Claude Desktop config → `tests/unified-gateway.mjs`;
+- runtime composition / manifest → `tests/distribution.mjs`;
+- Antigravity compatibility / DNS / WebUI patch → proxy compatibility tests.
 
-Claude, Gemini, Google Antigravity и названия моделей принадлежат соответствующим владельцам товарных знаков.
+Не полагайтесь только на успешный локальный запуск: финальный bundle строится из pinned upstream sources и должен проходить тот же validation path, что используется в CI.
 
-Проект предоставляется «как есть». Автор проекта не может гарантировать доступность конкретных моделей, квот или неизменность поведения сторонних сервисов.
+## Сторонние компоненты и ответственность
+
+Информация о bundled third-party software находится в [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Лицензионные файлы зависимостей также сохраняются внутри runtime bundle.
+
+Claude, Claude Desktop, Gemini, Google Antigravity и другие упомянутые названия принадлежат соответствующим правообладателям.
+
+Проект предоставляется без гарантий доступности сторонних сервисов, моделей, квот или совместимости с будущими изменениями upstream API.
