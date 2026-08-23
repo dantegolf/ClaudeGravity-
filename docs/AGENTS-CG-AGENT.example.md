@@ -1,12 +1,16 @@
 # Codex + CG-Agent
 
-When implementation work can be delegated, use CG-Agent as a Gemini worker.
+CG-Agent is an optional Gemini implementation worker that uses the Antigravity engine already managed by ClaudeGravity.
+
+Before running it, start ClaudeGravity normally and wait until the WebUI reports `READY`. CG-Agent connects to the managed loopback engine at `http://127.0.0.1:18080`; it does not start a second `acc` proxy.
 
 Example:
 
 ```bash
 ~/ClaudeGravity/CG-Agent.sh --repo "$PWD" --task-file /tmp/gemini-task.md
 ```
+
+On macOS the default ClaudeGravity directory is under `~/Documents/ClaudeGravity`.
 
 On Windows:
 
@@ -22,4 +26,4 @@ Rules for the supervisor:
 - After CG-Agent finishes, independently inspect `git diff` and `git status`.
 - Run the relevant tests, lint, typecheck and build yourself.
 - If review fails, send a narrower remediation task to CG-Agent.
-- The Gemini worker must not commit, push, reset hard, or publish changes.
+- The Gemini worker must not commit, push, hard-reset, force-clean or publish changes.
