@@ -3,13 +3,21 @@
 import { readFile, writeFile, readdir, stat, realpath, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, relative, dirname, sep } from 'node:path';
-import { exec as execCb, spawnSync } from 'node:child_process';
+import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const exec = promisify(execCb);
 
 function parseArgs(argv) {
-  const out = { repo: process.cwd(), model: 'gemini-3.1-pro-high', maxTurns: 24, task: '', taskFile: '', baseUrl: process.env.CG_AGENT_BASE_URL || 'http://127.0.0.1:8080', apiKey: process.env.CG_AGENT_API_KEY || 'antigravity' };
+  const out = {
+    repo: process.cwd(),
+    model: 'gemini-3.1-pro-high',
+    maxTurns: 24,
+    task: '',
+    taskFile: '',
+    baseUrl: process.env.CG_AGENT_BASE_URL || 'http://127.0.0.1:18080',
+    apiKey: process.env.CG_AGENT_API_KEY || 'antigravity',
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--repo') out.repo = argv[++i];
@@ -26,7 +34,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.log(`cg-agent - Gemini coding worker through ClaudeGravity Antigravity proxy
+  console.log(`cg-agent - Gemini coding worker through the managed ClaudeGravity engine
 
 Usage:
   cg-agent --repo <path> --task "implement feature"
@@ -35,24 +43,33 @@ Usage:
 Options:
   --model <id>       default: gemini-3.1-pro-high
   --max-turns <n>    default: 24
-  --base-url <url>   default: http://127.0.0.1:8080
+  --base-url <url>   default: http://127.0.0.1:18080
   --api-key <key>    default: antigravity
+
+ClaudeGravity must already be running. CG-Agent intentionally does not start or own
+the Antigravity engine; the main ClaudeGravity supervisor owns that lifecycle.
 `);
 }
 
 const args = parseArgs(process.argv.slice(2));
-if (args.help) { usage(); process.exit(0); }
+if (args.help) {
+  usage();
+  process.exit(0);
+}
 
 const root = resolve(args.repo);
 if (!existsSync(root)) throw new Error(`Repository path does not exist: ${root}`);
 
 let task = args.task;
 if (args.taskFile) task = await readFile(resolve(args.taskFile), 'utf8');
-if (!task.trim()) { usage(); throw new Error('Task is required.'); }
+if (!task.trim()) {
+  usage();
+  throw new Error('Task is required.');
+}
 
 function insideRoot(path) {
   const rel = relative(root, path);
-  return rel === '' || (!rel.startsWith('..' + sep) && rel !== '..' && !resolve(path).startsWith('..'));
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..');
 }
 
 async function safePath(input, allowMissing = false) {
@@ -69,51 +86,73 @@ async function safePath(input, allowMissing = false) {
 }
 
 async function ensureProxy() {
-  try {
-    const r = await fetch(`${args.baseUrl}/health`, { signal: AbortSignal.timeout(2500) });
-    if (r.ok) return;
-  } catch {}
-
-  const cmd = process.platform === 'win32' ? 'acc.cmd' : 'acc';
-  const started = spawnSync(cmd, ['start'], { stdio: 'inherit', shell: process.platform === 'win32' });
-  if (started.status !== 0) throw new Error('Antigravity proxy is not running and acc start failed.');
-
-  for (let i = 0; i < 12; i++) {
-    await new Promise(r => setTimeout(r, 750));
+  for (let i = 0; i < 4; i++) {
     try {
-      const health = await fetch(`${args.baseUrl}/health`, { signal: AbortSignal.timeout(2500) });
-      if (health.ok) return;
-    } catch {}
+      const response = await fetch(`${args.baseUrl}/health`, { signal: AbortSignal.timeout(2500) });
+      if (response.ok) return;
+    } catch {
+      // Retry briefly in case the managed supervisor is still starting.
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 500));
   }
-  throw new Error(`Proxy did not become healthy at ${args.baseUrl}/health`);
+
+  throw new Error(
+    `ClaudeGravity engine is not ready at ${args.baseUrl}. ` +
+    'Start ClaudeGravity first and wait until its WebUI reports READY. ' +
+    'CG-Agent no longer runs acc/start or creates a second proxy process.'
+  );
 }
 
 const tools = [
   {
     name: 'read_file',
     description: 'Read a UTF-8 text file inside the repository.',
-    input_schema: { type: 'object', properties: { path: { type: 'string' }, start_line: { type: 'integer' }, end_line: { type: 'integer' } }, required: ['path'] }
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        start_line: { type: 'integer' },
+        end_line: { type: 'integer' },
+      },
+      required: ['path'],
+    },
   },
   {
     name: 'write_file',
     description: 'Create or fully replace a UTF-8 text file inside the repository.',
-    input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] }
+    input_schema: {
+      type: 'object',
+      properties: { path: { type: 'string' }, content: { type: 'string' } },
+      required: ['path', 'content'],
+    },
   },
   {
     name: 'list_files',
     description: 'List files/directories inside a repository path.',
-    input_schema: { type: 'object', properties: { path: { type: 'string' } } }
+    input_schema: { type: 'object', properties: { path: { type: 'string' } } },
   },
   {
     name: 'search_text',
     description: 'Search text recursively in repository files. Skips .git and common dependency/build directories.',
-    input_schema: { type: 'object', properties: { query: { type: 'string' }, path: { type: 'string' }, max_results: { type: 'integer' } }, required: ['query'] }
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        path: { type: 'string' },
+        max_results: { type: 'integer' },
+      },
+      required: ['query'],
+    },
   },
   {
     name: 'shell',
-    description: 'Run a shell command in the repository root. Use for tests, lint, git diff/status, builds and repository inspection. Do not commit or push.',
-    input_schema: { type: 'object', properties: { command: { type: 'string' }, timeout_ms: { type: 'integer' } }, required: ['command'] }
-  }
+    description: 'Run a shell command in the repository root. Use for tests, lint, git diff/status, builds and repository inspection. Do not commit, push, hard-reset or force-clean.',
+    input_schema: {
+      type: 'object',
+      properties: { command: { type: 'string' }, timeout_ms: { type: 'integer' } },
+      required: ['command'],
+    },
+  },
 ];
 
 async function runTool(name, input) {
@@ -137,7 +176,7 @@ async function runTool(name, input) {
   if (name === 'list_files') {
     const p = await safePath(input.path || '.');
     const entries = await readdir(p, { withFileTypes: true });
-    return entries.slice(0, 500).map(e => `${e.isDirectory() ? 'dir ' : 'file'} ${e.name}`).join('\n');
+    return entries.slice(0, 500).map((entry) => `${entry.isDirectory() ? 'dir ' : 'file'} ${entry.name}`).join('\n');
   }
 
   if (name === 'search_text') {
@@ -146,6 +185,7 @@ async function runTool(name, input) {
     const max = Math.min(Math.max(Number(input.max_results || 100), 1), 300);
     const skip = new Set(['.git', 'node_modules', 'dist', 'build', '.next', '.venv', 'venv', 'target', 'coverage']);
     const results = [];
+
     async function walk(dir) {
       if (results.length >= max) return;
       for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -153,30 +193,44 @@ async function runTool(name, input) {
         if (skip.has(entry.name)) continue;
         const p = resolve(dir, entry.name);
         if (!insideRoot(p)) continue;
-        if (entry.isDirectory()) { await walk(p); continue; }
-        let s;
-        try { if ((await stat(p)).size > 2_000_000) continue; s = await readFile(p, 'utf8'); } catch { continue; }
-        const lines = s.split(/\r?\n/);
+        if (entry.isDirectory()) {
+          await walk(p);
+          continue;
+        }
+        let text;
+        try {
+          if ((await stat(p)).size > 2_000_000) continue;
+          text = await readFile(p, 'utf8');
+        } catch {
+          continue;
+        }
+        const lines = text.split(/\r?\n/);
         for (let i = 0; i < lines.length && results.length < max; i++) {
           if (lines[i].includes(query)) results.push(`${relative(root, p)}:${i + 1}: ${lines[i].slice(0, 500)}`);
         }
       }
     }
+
     await walk(base);
     return results.join('\n') || 'No matches.';
   }
 
   if (name === 'shell') {
     const command = String(input.command);
-    if (/\bgit\s+(push|commit|reset\s+--hard|clean\s+-[a-zA-Z]*f)/.test(command)) {
-      throw new Error('Blocked destructive/publishing git command. The supervisor owns commit/push/reset.');
+    if (/\bgit\s+(push|commit|reset\s+--hard|clean\s+-[a-zA-Z]*f)/i.test(command)) {
+      throw new Error('Blocked destructive/publishing git command. The supervisor owns commit/push/reset/clean.');
     }
     const timeout = Math.min(Math.max(Number(input.timeout_ms || 120000), 1000), 600000);
     try {
-      const { stdout, stderr } = await exec(command, { cwd: root, timeout, maxBuffer: 4 * 1024 * 1024, windowsHide: true });
+      const { stdout, stderr } = await exec(command, {
+        cwd: root,
+        timeout,
+        maxBuffer: 4 * 1024 * 1024,
+        windowsHide: true,
+      });
       return `${stdout}${stderr ? `\n[stderr]\n${stderr}` : ''}`.slice(0, 300000);
-    } catch (e) {
-      return `exit/error: ${e.message}\nstdout:\n${e.stdout || ''}\nstderr:\n${e.stderr || ''}`.slice(0, 300000);
+    } catch (error) {
+      return `exit/error: ${error.message}\nstdout:\n${error.stdout || ''}\nstderr:\n${error.stderr || ''}`.slice(0, 300000);
     }
   }
 
@@ -190,16 +244,16 @@ async function callModel(messages) {
       'content-type': 'application/json',
       'anthropic-version': '2023-06-01',
       'x-api-key': args.apiKey,
-      'authorization': `Bearer ${args.apiKey}`
+      authorization: `Bearer ${args.apiKey}`,
     },
     body: JSON.stringify({
       model: args.model,
       max_tokens: 16384,
-      system: `You are Gemini acting as an implementation engineer under a Codex supervisor. Work only inside the provided repository. Inspect existing architecture before editing. Use tools to read and modify files and to run relevant tests/lint/typecheck. Keep changes focused on the task. Never commit, push, reset --hard, or delete unrelated work. Do not merely describe code: implement it. When finished, summarize changed files and verification results for the supervisor. Repository root: ${root}`,
+      system: `You are Gemini acting as an implementation engineer under a Codex supervisor. Work only inside the provided repository. Inspect existing architecture before editing. Use tools to read and modify files and to run relevant tests/lint/typecheck. Keep changes focused on the task. Never commit, push, reset --hard, force-clean, or publish changes. Do not merely describe code: implement it. When finished, summarize changed files and verification results for the supervisor. Repository root: ${root}`,
       messages,
-      tools
+      tools,
     }),
-    signal: AbortSignal.timeout(600000)
+    signal: AbortSignal.timeout(600000),
   });
 
   const text = await response.text();
@@ -210,6 +264,7 @@ async function callModel(messages) {
 await ensureProxy();
 console.error(`[cg-agent] repo=${root}`);
 console.error(`[cg-agent] model=${args.model}`);
+console.error(`[cg-agent] engine=${args.baseUrl}`);
 
 const messages = [{ role: 'user', content: task }];
 let finalText = '';
@@ -219,8 +274,8 @@ for (let turn = 1; turn <= args.maxTurns; turn++) {
   const content = Array.isArray(response.content) ? response.content : [];
   messages.push({ role: 'assistant', content });
 
-  const toolUses = content.filter(b => b?.type === 'tool_use');
-  const texts = content.filter(b => b?.type === 'text').map(b => b.text).filter(Boolean);
+  const toolUses = content.filter((block) => block?.type === 'tool_use');
+  const texts = content.filter((block) => block?.type === 'text').map((block) => block.text).filter(Boolean);
   if (texts.length) finalText = texts.join('\n');
 
   if (!toolUses.length) {
@@ -229,13 +284,13 @@ for (let turn = 1; turn <= args.maxTurns; turn++) {
   }
 
   const results = [];
-  for (const t of toolUses) {
-    console.error(`[cg-agent] tool ${t.name}`);
+  for (const toolUse of toolUses) {
+    console.error(`[cg-agent] tool ${toolUse.name}`);
     try {
-      const result = await runTool(t.name, t.input || {});
-      results.push({ type: 'tool_result', tool_use_id: t.id, content: String(result) });
-    } catch (e) {
-      results.push({ type: 'tool_result', tool_use_id: t.id, is_error: true, content: e.message });
+      const result = await runTool(toolUse.name, toolUse.input || {});
+      results.push({ type: 'tool_result', tool_use_id: toolUse.id, content: String(result) });
+    } catch (error) {
+      results.push({ type: 'tool_result', tool_use_id: toolUse.id, is_error: true, content: error.message });
     }
   }
   messages.push({ role: 'user', content: results });
