@@ -17,4 +17,18 @@ ClaudeGravity distributes pinned third-party components inside its release bundl
 - License: MIT
 - Copyright: 2026 Jacob Ben David
 
+## Alpine.js 3.16.2
+
+- Package: `alpinejs`
+- Upstream: https://github.com/alpinejs/alpine
+- License: MIT
+- ClaudeGravity vendors the browser build into the local WebUI so dashboard rendering does not depend on a public CDN.
+
+## Chart.js 4.5.1
+
+- Package: `chart.js`
+- Upstream: https://github.com/chartjs/Chart.js
+- License: MIT
+- ClaudeGravity vendors the UMD browser build into the local WebUI so charts load from the same loopback origin.
+
 ClaudeGravity is independent and is not affiliated with Anthropic or Google. Product and model names belong to their respective owners.
