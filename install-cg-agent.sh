@@ -7,10 +7,10 @@ else
   INSTALL_DIR="${HOME}/ClaudeGravity"
 fi
 SCRIPTS_DIR="${INSTALL_DIR}/scripts"
-RAW_BASE="${CLAUDEGRAVITY_RAW_BASE:-https://raw.githubusercontent.com/olegsuper338-lgtm/ClaudeGravity-/agent/cg-agent-gemini-worker}"
+RAW_BASE="${CLAUDEGRAVITY_RAW_BASE:-https://raw.githubusercontent.com/dantegolf/ClaudeGravity-/main}"
 
 command -v node >/dev/null 2>&1 || { echo "Node.js не найден. Сначала установите ClaudeGravity." >&2; exit 1; }
-command -v acc >/dev/null 2>&1 || { echo "acc не найден. Сначала установите ClaudeGravity." >&2; exit 1; }
+[[ -f "${SCRIPTS_DIR}/supervisor.mjs" ]] || { echo "Основной ClaudeGravity runtime не найден в ${INSTALL_DIR}. Сначала установите ClaudeGravity." >&2; exit 1; }
 
 mkdir -p "$SCRIPTS_DIR"
 curl -fsSL "$RAW_BASE/launchers/scripts/cg-agent.mjs" -o "$SCRIPTS_DIR/cg-agent.mjs"
@@ -20,5 +20,6 @@ node --check "$SCRIPTS_DIR/cg-agent.mjs"
 
 echo
 echo "CG-Agent установлен: $INSTALL_DIR/CG-Agent.sh"
+echo "Перед использованием запустите ClaudeGravity и дождитесь READY в WebUI."
 echo "Пример:"
 echo "  $INSTALL_DIR/CG-Agent.sh --repo /path/to/project --task 'Реализуй задачу'"
