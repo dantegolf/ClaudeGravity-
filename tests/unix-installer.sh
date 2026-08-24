@@ -6,6 +6,9 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 bash -n \
   "${ROOT}/install-macos.sh" \
   "${ROOT}/install-linux.sh" \
+  "${ROOT}/install-cg-agent.sh" \
+  "${ROOT}/launchers/CG-Delegate.sh" \
+  "${ROOT}/launchers/CD-Delegate.sh" \
   "${ROOT}/distribution/runtime/ClaudeGravity.sh" \
   "${ROOT}/distribution/runtime/Check-Limits.sh"
 
@@ -53,6 +56,10 @@ node --check "${ROOT}/launchers/scripts/configure-relay.mjs"
 node --check "${ROOT}/launchers/scripts/configure-claude-desktop.mjs"
 node --check "${ROOT}/launchers/scripts/supervisor.mjs"
 node --check "${ROOT}/launchers/scripts/patch-antigravity-proxy.mjs"
+node --check "${ROOT}/launchers/scripts/cg-agent.mjs"
+node --check "${ROOT}/launchers/scripts/cg-delegate.mjs"
+node --check "${ROOT}/launchers/scripts/install-codex-integration.mjs"
+node "${ROOT}/tests/codex-delegation.mjs"
 node "${ROOT}/tests/proxy-compat.mjs"
 node "${ROOT}/tests/distribution.mjs"
 node "${ROOT}/tests/unified-gateway.mjs"
