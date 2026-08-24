@@ -32,6 +32,6 @@ Write-Host "Codex delegate установлен: $InstallDir\CG-Delegate.cmd" -F
 Write-Host "Алиас: $InstallDir\CD-Delegate.cmd"
 Write-Host "Перед использованием запустите ClaudeGravity и дождитесь READY в WebUI."
 Write-Host "Пример worker-вызова:"
-Write-Host '  CG-Agent.cmd --repo C:\Projects\app --task "Проверь проект и реализуй задачу"'
+Write-Host '  CG-Agent.cmd --repo C:\Projects\app --task-file C:\Temp\task.md'
 Write-Host "Пример supervisor-вызова:"
-Write-Host '  %USERPROFILE%\.claudegravity\bin\cg-delegate.cmd --repo C:\Projects\app --task "Реализуй задачу"'
+Write-Host '  %USERPROFILE%\.claudegravity\bin\cg-delegate.cmd --repo C:\Projects\app --task-file C:\Temp\task.md'
