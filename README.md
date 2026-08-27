@@ -16,6 +16,7 @@
 <p align="center">
   <a href="#возможности">Возможности</a> ·
   <a href="#установка">Установка</a> ·
+  <a href="#модели-relay-ai">Модели</a> ·
   <a href="#архитектура">Архитектура</a> ·
   <a href="#webui">WebUI</a> ·
   <a href="#cg-agent">CG-Agent</a> ·
@@ -139,6 +140,20 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-
 
 Доступность конкретных model ID и квот определяется Google и вашим аккаунтом. Наличие модели в локальном registry не гарантирует её доступность на стороне сервиса.
 
+## Модели Relay AI
+
+ClaudeGravity регистрирует 22 model ID в локальном Relay AI registry:
+
+- Gemini 3.7 Flash: Low, Medium и High;
+- Gemini 3.6 Flash: Low, Medium, High и Tiered;
+- Gemini 3.5 Flash: Extra Low и Low;
+- Gemini 3.1 Pro: Low и High; Gemini 3.1 Flash: Image и Lite;
+- Gemini 3 Flash, Gemini 3 Flash Agent и Gemini Pro Agent;
+- Gemini 2.5 Pro, Flash, Flash Lite и Flash Thinking;
+- Claude Sonnet 4.6 и Claude Opus 4.6 Thinking.
+
+При первой настройке в избранное добавляются Gemini 3.7 Flash High, Gemini 3.1 Pro High, Gemini 2.5 Pro, Claude Sonnet 4.6 и Claude Opus 4.6 Thinking. Последующие пользовательские изменения избранного сохраняются.
+
 ## WebUI
 
 ClaudeGravity использует WebUI bundled Antigravity Proxy, который патчится при сборке под интерфейс ClaudeGravity.
@@ -220,6 +235,8 @@ ClaudeGravity использует WebUI bundled Antigravity Proxy, которы
 ## Bundled runtime
 
 ClaudeGravity не полагается на `npm @latest` на машине пользователя. GitHub Actions собирает runtime из зафиксированных upstream inputs, применяет compatibility patch, выполняет тесты и упаковывает результат в release assets.
+
+Compatibility patch идемпотентно добавляет поддержку протокола Antigravity 2.8, selective Smart DNS, брендинг WebUI и мост live-логов supervisor. Для запросов он синхронизирует hub User-Agent, metadata, labels и request ID, включает validated tool calls, учитывает лимит вывода Gemini 3.7 в 65 536 токенов и thinking budget Gemini 3.7 Flash Medium. Если upstream уже поддерживает протокол нативно, protocol-часть пропускается; неизвестная структура исходников завершает сборку ошибкой вместо частичной правки.
 
 Текущие pinned inputs определены в [`distribution/manifest.json`](distribution/manifest.json):
 
