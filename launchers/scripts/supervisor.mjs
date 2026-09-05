@@ -341,6 +341,11 @@ async function startEngines() {
   proxyReady = true;
   recordLog('SUCCESS', 'Antigravity engine ready.', 'supervisor');
 
+  // Relay snapshots its catalog at startup. Discover models only after the
+  // authenticated Antigravity endpoint is ready, including on WebUI Restart.
+  const refreshed = runNode(configureRelayScript, [relayHome, internalBaseUrl, '--refresh-models'], { source: 'models' });
+  if (refreshed.status !== 0) fail('Не удалось обновить каталог моделей Relay AI.');
+
   recordLog('INFO', `Starting unified gateway on ${gatewayBaseUrl}`, 'supervisor');
   startRelay();
   await waitForHttp(`${gatewayBaseUrl}/health`, relayChild, 'ClaudeGravity gateway');
