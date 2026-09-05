@@ -76,6 +76,10 @@ for (const key of ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy']) {
     await assert.rejects(failed.fetch(gate));
     assert.equal(failed.calls.length, 1, 'never bypass an explicit user proxy on failure');
 }
+for (const key of ['HTTPS_PROXY', 'HTTP_PROXY']) {
+    const cleared = runtime({ [key]: 'http://proxy.test:3128', [key.toLowerCase()]: '' });
+    assert.equal(cleared.routes.length, 4, 'an explicitly empty lowercase proxy overrides uppercase');
+}
 
 const custom = runtime({ CLAUDEGRAVITY_SMART_DNS_SERVERS: '192.0.2.53, 192.0.2.54' });
 assert.equal(custom.routes.length, 1, 'custom servers replace all public defaults, including DoH');

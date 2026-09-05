@@ -11,8 +11,8 @@ const claudeGravityGateHosts = new Set([
 const claudeGravityDnsDisabled = ['0', 'false', 'off', 'disabled'].includes(
     (process.env.CLAUDEGRAVITY_SMART_DNS || 'auto').trim().toLowerCase()
 );
-const claudeGravityOwnProxy = process.env.https_proxy || process.env.HTTPS_PROXY ||
-    process.env.http_proxy || process.env.HTTP_PROXY;
+const claudeGravityOwnProxy = (process.env.https_proxy ?? process.env.HTTPS_PROXY) ||
+    (process.env.http_proxy ?? process.env.HTTP_PROXY);
 // NO_PROXY/no_proxy and lowercase precedence are handled by Undici. Never
 // change global dispatchers or environment variables used by other processes.
 const claudeGravityProxyAgent = claudeGravityOwnProxy ? new EnvHttpProxyAgent() : null;
