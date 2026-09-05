@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm';
 import { EventEmitter } from 'node:events';
 
 const source = (await readFile(new URL('../launchers/scripts/smart-dns.mjs', import.meta.url), 'utf8'))
-    .replace(/^import .*;\n/gm, '');
+    .replace(/^import .*;\r?\n/gm, '');
 const gate = 'https://cloudcode-pa.googleapis.com/v1internal:generateContent';
 const body = JSON.stringify({ request: { contents: [] } });
 const ok = () => new Response('ok');
