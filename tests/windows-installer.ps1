@@ -141,4 +141,9 @@ foreach ($script in @($supervisorPath, $desktopConfigPath, $configureRelayPath, 
   if ($LASTEXITCODE -ne 0) { throw "Node syntax check failed: $script" }
 }
 
+foreach ($test in @('proxy-compat.mjs', 'smart-dns.mjs')) {
+  & node.exe (Join-Path $PSScriptRoot $test)
+  if ($LASTEXITCODE -ne 0) { throw "Network compatibility check failed: $test" }
+}
+
 Write-Host "Windows silent WebUI distribution checks passed."

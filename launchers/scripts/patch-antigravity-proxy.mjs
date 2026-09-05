@@ -29,7 +29,7 @@ const replaceExact = async (name, before, after, alreadyAppliedMarker = null) =>
   throw new Error(`${name}: expected one compatible source block, found ${occurrences}`);
 };
 
-const SMART_DNS_MARKER = "ClaudeGravity selective Smart DNS v1";
+const SMART_DNS_MARKER = "ClaudeGravity selective Smart DNS v2";
 const WEBUI_MARKER = "ClaudeGravity WebUI v1";
 
 const patchSmartDns = async () => {
@@ -38,89 +38,28 @@ const patchSmartDns = async () => {
   if (source.includes(SMART_DNS_MARKER)) return false;
 
   const configImport = "import { config } from '../config.js';";
-  const fetchCall = "    return fetch(url, options);";
-  if (source.split(configImport).length - 1 !== 1) {
-    throw new Error(`${name}: expected one config import for Smart DNS patch`);
-  }
-  if (source.split(fetchCall).length - 1 !== 1) {
-    throw new Error(`${name}: expected one throttled fetch call for Smart DNS patch`);
-  }
-
-  const smartDnsRuntime = `
-import { Agent, fetch as undiciFetch } from 'undici';
-import { Resolver, lookup as systemLookup } from 'node:dns';
-
-// ${SMART_DNS_MARKER}
-// Route only Antigravity/Cloud Code API names through the optional Smart DNS
-// resolver. OAuth, accounts.google.com, and every unrelated hostname keep the
-// system resolver. TLS still connects with the original hostname/SNI.
-const CLAUDEGRAVITY_SMART_DNS_HOSTS = new Set([
-    'cloudcode-pa.googleapis.com',
-    'daily-cloudcode-pa.googleapis.com',
-    'generativelanguage.googleapis.com',
-    'antigravity-unleash.goog'
-]);
-const CLAUDEGRAVITY_SMART_DNS_DISABLED = new Set(['0', 'false', 'off', 'disabled']);
-const claudeGravitySmartDnsMode = (process.env.CLAUDEGRAVITY_SMART_DNS || 'auto').trim().toLowerCase();
-const claudeGravitySmartDnsEnabled = !CLAUDEGRAVITY_SMART_DNS_DISABLED.has(claudeGravitySmartDnsMode);
-const claudeGravitySmartDnsServers = (process.env.CLAUDEGRAVITY_SMART_DNS_SERVERS || '111.88.96.50,111.88.96.51')
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-
-let claudeGravitySmartResolver = null;
-if (claudeGravitySmartDnsEnabled && claudeGravitySmartDnsServers.length > 0) {
-    try {
-        claudeGravitySmartResolver = new Resolver();
-        claudeGravitySmartResolver.setServers(claudeGravitySmartDnsServers);
-    } catch {
-        // Invalid/custom resolver configuration must never prevent proxy startup.
-        claudeGravitySmartResolver = null;
-    }
-}
-
-function claudeGravitySmartLookup(hostname, options, callback) {
-    const fallback = () => systemLookup(hostname, options, callback);
-    const normalized = String(hostname || '').toLowerCase();
-    const family = typeof options === 'number' ? options : (options?.family || 0);
-    if (!claudeGravitySmartResolver || family === 6 || !CLAUDEGRAVITY_SMART_DNS_HOSTS.has(normalized)) {
-        fallback();
-        return;
-    }
-
-    claudeGravitySmartResolver.resolve4(hostname, (error, addresses) => {
-        if (error || !Array.isArray(addresses) || addresses.length === 0) {
-            fallback();
-            return;
-        }
-        if (typeof options === 'object' && options?.all) {
-            callback(null, addresses.map(address => ({ address, family: 4 })));
-            return;
-        }
-        callback(null, addresses[0], 4);
-    });
-}
-
-const claudeGravitySmartDnsAgent = new Agent({
-    connect: { lookup: claudeGravitySmartLookup }
-});
-
-function claudeGravitySmartDnsDispatcher(url, options) {
-    if (!claudeGravitySmartResolver || options?.dispatcher) return null;
-    try {
-        const hostname = new URL(url).hostname.toLowerCase();
-        return CLAUDEGRAVITY_SMART_DNS_HOSTS.has(hostname) ? claudeGravitySmartDnsAgent : null;
-    } catch {
-        return null;
-    }
-}
-`;
-
-  let updated = source.replace(configImport, `${configImport}${smartDnsRuntime}`);
-  updated = updated.replace(fetchCall, `    const dispatcher = claudeGravitySmartDnsDispatcher(url, options);
+  let updated = source;
+  if (source.includes('ClaudeGravity selective Smart DNS v1')) {
+    const start = source.indexOf("\nimport { Agent, fetch as undiciFetch } from 'undici';");
+    const dispatcherStart = source.indexOf('function claudeGravitySmartDnsDispatcher(');
+    const end = source.indexOf("\n}\n", dispatcherStart) + 3;
+    const legacyFetch = `    const dispatcher = claudeGravitySmartDnsDispatcher(url, options);
     return dispatcher
         ? undiciFetch(url, { ...options, dispatcher })
-        : fetch(url, options);`);
+        : fetch(url, options);`;
+    if (start < 0 || dispatcherStart < start || end <= dispatcherStart || source.split(legacyFetch).length !== 2) {
+      throw new Error(`${name}: incompatible legacy Smart DNS patch`);
+    }
+    updated = source.slice(0, start) + source.slice(end);
+    updated = updated.replace(legacyFetch, '    return fetch(url, options);');
+  }
+  const fetchCall = "    return fetch(url, options);";
+  if (updated.split(configImport).length !== 2 || updated.split(fetchCall).length !== 2) {
+    throw new Error(`${name}: expected one config import and throttled fetch call for Smart DNS patch`);
+  }
+  const runtime = await readFile(new URL('./smart-dns.mjs', import.meta.url), 'utf8');
+  updated = updated.replace(fetchCall, '    return claudeGravityFetch(url, options);');
+  updated = updated.replace(configImport, `${configImport}\n${runtime}`);
   files.set(name, updated);
   changed = true;
   return true;

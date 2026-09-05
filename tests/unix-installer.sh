@@ -54,6 +54,7 @@ node --check "${ROOT}/launchers/scripts/configure-claude-desktop.mjs"
 node --check "${ROOT}/launchers/scripts/supervisor.mjs"
 node --check "${ROOT}/launchers/scripts/patch-antigravity-proxy.mjs"
 node "${ROOT}/tests/proxy-compat.mjs"
+node "${ROOT}/tests/smart-dns.mjs"
 node "${ROOT}/tests/distribution.mjs"
 node "${ROOT}/tests/unified-gateway.mjs"
 
