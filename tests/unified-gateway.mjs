@@ -17,7 +17,19 @@ const fakeProxy = join(temp, 'fake-proxy.mjs');
 const fakeRelay = join(temp, 'fake-relay.mjs');
 const originalMetaPath = join(desktopHome, 'configLibrary', '_meta.json');
 const originalMeta = `${JSON.stringify({ appliedId: 'before', entries: [{ id: 'before', name: 'Existing config' }] }, null, 2)}\n`;
-const controlUrl = 'http://127.0.0.1:17646';
+// Keep integration fixtures away from a user's running ClaudeGravity instance.
+const listeners = await Promise.all(Array.from({ length: 3 }, () => new Promise(resolve => {
+  const server = http.createServer();
+  server.listen(0, '127.0.0.1', () => resolve(server));
+})));
+const [internalPort, gatewayPort, controlPort] = listeners.map(server => server.address().port);
+await Promise.all(listeners.map(server => new Promise(resolve => server.close(resolve))));
+const internalBaseUrl = `http://127.0.0.1:${internalPort}`;
+const gatewayBaseUrl = `http://127.0.0.1:${gatewayPort}`;
+const controlUrl = `http://127.0.0.1:${controlPort}`;
+const modelCatalogPath = join(temp, 'model-catalog.json');
+const discoveredModels = ['high', 'medium', 'low', 'tiered'].map(variant => ({ id: `gemini-3.8-flash-${variant}` }));
+writeFileSync(modelCatalogPath, JSON.stringify({ data: discoveredModels }));
 
 function request(url, { method = 'GET' } = {}) {
   return new Promise((resolveRequest, rejectRequest) => {
@@ -82,12 +94,17 @@ writeFileSync(originalMetaPath, originalMeta, 'utf8');
 
 writeFileSync(fakeProxy, `
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
 if (process.env.HOST !== '127.0.0.1') throw new Error('proxy must bind loopback only');
-if (process.env.PORT !== '18080') throw new Error('proxy must use internal port 18080');
+if (process.env.PORT !== '${internalPort}') throw new Error('proxy must use internal port 18080');
 const server = http.createServer((req, res) => {
   res.setHeader('content-type', req.url === '/' ? 'text/html' : 'application/json');
   if (req.url === '/') return res.end('<html><title>ClaudeGravity</title></html>');
   if (req.url === '/health') return res.end(JSON.stringify({ ok: true, engine: 'antigravity' }));
+  if (req.url === '/v1/models') {
+    if (req.headers['x-api-key'] !== 'antigravity') { res.statusCode = 401; return res.end('{}'); }
+    return res.end(readFileSync(process.env.CLAUDEGRAVITY_TEST_MODELS, 'utf8'));
+  }
   if (req.url === '/account-limits') return res.end(JSON.stringify({ accounts: 1 }));
   res.statusCode = 404; res.end(JSON.stringify({ error: 'not found' }));
 });
@@ -98,6 +115,9 @@ process.on('SIGTERM', stop); process.on('SIGINT', stop);
 
 writeFileSync(fakeRelay, `
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+const catalog = JSON.parse(readFileSync(join(process.env.RELAY_AI_HOME, 'providers.json'), 'utf8')).providers.find(p => p.id === 'custom-antigravity').modelsCache.models;
 const args = process.argv.slice(2);
 const expected = ['server', '--quick', '--listen', 'local', '--providers', 'custom-antigravity', '--no-free-only', '--mask-gateway-ids'];
 for (const token of expected) if (!args.includes(token)) throw new Error('missing relay arg: ' + token);
@@ -105,7 +125,7 @@ const port = Number(process.env.CLAUDEGRAVITY_GATEWAY_PORT || 17645);
 const server = http.createServer((req, res) => {
   res.setHeader('content-type', 'application/json');
   if (req.url === '/health') return res.end(JSON.stringify({ ok: true, gateway: 'relay' }));
-  if (req.url === '/anthropic/v1/models') return res.end(JSON.stringify({ data: [{ id: 'masked-model' }] }));
+  if (req.url === '/anthropic/v1/models') return res.end(JSON.stringify({ data: catalog.map(model => ({ id: model.id })) }));
   res.statusCode = 404; res.end(JSON.stringify({ error: 'not found' }));
 });
 server.listen(port, '127.0.0.1', () => console.error('relay-online-log'));
@@ -117,18 +137,23 @@ const configuredRelayHome = join(temp, 'relay-config-test');
 const configure = spawn(process.execPath, [
   join(root, 'launchers', 'scripts', 'configure-relay.mjs'),
   configuredRelayHome,
-  'http://127.0.0.1:18080',
+  internalBaseUrl,
 ], { stdio: 'inherit' });
 const configureCode = await new Promise((resolveExit) => configure.once('exit', resolveExit));
 if (configureCode !== 0) throw new Error('configure-relay integration setup failed');
 const registry = JSON.parse(readFileSync(join(configuredRelayHome, 'providers.json'), 'utf8'));
 const provider = registry.providers.find((entry) => entry.id === 'custom-antigravity');
-if (provider?.api?.url !== 'http://127.0.0.1:18080') throw new Error('Relay provider did not move to the internal engine port');
-if (!provider.modelsCache.models.every((model) => model.apiUrl === 'http://127.0.0.1:18080')) throw new Error('Relay models still expose the legacy proxy port');
+if (provider?.api?.url !== internalBaseUrl) throw new Error('Relay provider did not move to the internal engine port');
+if (!provider.modelsCache.models.every((model) => model.apiUrl === internalBaseUrl)) throw new Error('Relay models still expose the legacy proxy port');
 
 const supervisorEnv = {
   ...process.env,
   RELAY_AI_HOME: relayHome,
+  CLAUDEGRAVITY_ANTIGRAVITY_PORT: String(internalPort),
+  CLAUDEGRAVITY_GATEWAY_PORT: String(gatewayPort),
+  CLAUDEGRAVITY_CONTROL_PORT: String(controlPort),
+  CLAUDEGRAVITY_ALLOW_TEST_PORTS: '1',
+  CLAUDEGRAVITY_TEST_MODELS: modelCatalogPath,
   CLAUDEGRAVITY_STATE_DIR: stateDir,
   CLAUDEGRAVITY_CLAUDE_DESKTOP_HOME: desktopHome,
   CLAUDEGRAVITY_PROXY_SERVER: fakeProxy,
@@ -152,19 +177,19 @@ supervisor.stderr.on('data', (chunk) => { output += chunk.toString(); });
 try {
   const controlStatus = await waitForReady();
   if (controlStatus.product !== 'ClaudeGravity') throw new Error('Control API product marker is missing');
-  if (controlStatus.uiUrl !== 'http://127.0.0.1:18080/') throw new Error('Control API does not expose the local WebUI URL');
-  if (controlStatus.publicEndpoint !== 'http://127.0.0.1:17645/anthropic') throw new Error('Control API public endpoint is incorrect');
+  if (controlStatus.uiUrl !== `${internalBaseUrl}/`) throw new Error('Control API does not expose the local WebUI URL');
+  if (controlStatus.publicEndpoint !== `${gatewayBaseUrl}/anthropic`) throw new Error('Control API public endpoint is incorrect');
 
-  await waitFor('http://127.0.0.1:18080/');
-  const gateway = await waitFor('http://127.0.0.1:17645/health');
+  await waitFor(`${internalBaseUrl}/`);
+  const gateway = await waitFor(`${gatewayBaseUrl}/health`);
   if (!gateway.body.includes('relay')) throw new Error('Public health endpoint is not the Relay gateway');
-  const models = await request('http://127.0.0.1:17645/anthropic/v1/models');
-  if (models.status !== 200 || !models.body.includes('masked-model')) throw new Error('Anthropic model discovery is not exposed on the unified gateway');
+  const models = await request(`${gatewayBaseUrl}/anthropic/v1/models`);
+  if (models.status !== 200 || !discoveredModels.every(model => JSON.parse(models.body).data.some(entry => entry.id === model.id))) throw new Error('Anthropic model discovery is not exposed on the unified gateway');
 
   const activeMeta = JSON.parse(readFileSync(originalMetaPath, 'utf8'));
   if (!activeMeta.appliedId || activeMeta.appliedId === 'before') throw new Error('Claude Desktop gateway config was not activated');
   const activeConfig = JSON.parse(readFileSync(join(desktopHome, 'configLibrary', `${activeMeta.appliedId}.json`), 'utf8'));
-  if (activeConfig.inferenceGatewayBaseUrl !== 'http://127.0.0.1:17645/anthropic') {
+  if (activeConfig.inferenceGatewayBaseUrl !== `${gatewayBaseUrl}/anthropic`) {
     throw new Error('Claude Desktop is not pointed at the unified public gateway');
   }
 
@@ -190,14 +215,30 @@ try {
   const stillReady = JSON.parse((await request(`${controlUrl}/health`)).body);
   if (!stillReady.ready) throw new Error('Duplicate launch disrupted the running gateway');
 
+  // Restart must refresh discovery before Relay takes its new catalog snapshot.
+  discoveredModels.push({ id: 'gemini-test-future-model' });
+  writeFileSync(modelCatalogPath, JSON.stringify({ data: discoveredModels }));
+  const restartResponse = await request(`${controlUrl}/action/restart`, { method: 'POST' });
+  if (restartResponse.status !== 202) throw new Error('Restart was rejected');
+  let refreshed = false;
+  for (let attempt = 0; attempt < 80; attempt++) {
+    try {
+      const updated = await request(`${gatewayBaseUrl}/anthropic/v1/models`);
+      if (updated.body.includes('gemini-test-future-model')) { refreshed = true; break; }
+    } catch { /* restarting */ }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  if (!refreshed) throw new Error('Restart did not synchronize new upstream models');
+  await waitForReady();
+
   const stopResponse = await request(`${controlUrl}/action/stop`, { method: 'POST' });
   if (stopResponse.status !== 202) throw new Error(`WebUI stop action returned ${stopResponse.status}`);
   const exitCode = await new Promise((resolveExit) => supervisor.once('exit', resolveExit));
   if (exitCode !== 0) throw new Error(`Supervisor exited with ${exitCode}. Output:\n${output}`);
 
-  await waitClosed('http://127.0.0.1:17646/health');
-  await waitClosed('http://127.0.0.1:17645/health');
-  await waitClosed('http://127.0.0.1:18080/');
+  await waitClosed(`${controlUrl}/health`);
+  await waitClosed(`${gatewayBaseUrl}/health`);
+  await waitClosed(`${internalBaseUrl}/`);
   if (readFileSync(originalMetaPath, 'utf8') !== originalMeta) throw new Error('Claude Desktop config was not restored after WebUI shutdown');
 
   const diskLog = readFileSync(join(stateDir, 'claudegravity.log'), 'utf8');

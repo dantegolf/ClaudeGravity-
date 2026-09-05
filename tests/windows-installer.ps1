@@ -141,7 +141,7 @@ foreach ($script in @($supervisorPath, $desktopConfigPath, $configureRelayPath, 
   if ($LASTEXITCODE -ne 0) { throw "Node syntax check failed: $script" }
 }
 
-foreach ($test in @('proxy-compat.mjs', 'smart-dns.mjs')) {
+foreach ($test in @('proxy-compat.mjs', 'smart-dns.mjs', 'model-catalog.mjs')) {
   & node.exe (Join-Path $PSScriptRoot $test)
   if ($LASTEXITCODE -ne 0) { throw "Network compatibility check failed: $test" }
 }

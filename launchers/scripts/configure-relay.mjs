@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import http from "node:http";
 import { join } from "node:path";
 
 const relayHome = process.argv[2];
@@ -44,9 +45,36 @@ const defaultFavorites = [
 ];
 
 const stamp = "2026-08-13T00:00:00.000Z";
-const models = modelIds.map((id) => ({
+const providersPath = join(relayHome, "providers.json");
+const registry = readJson(providersPath, { schemaVersion: 1, providers: [] });
+registry.schemaVersion = 1;
+registry.providers = Array.isArray(registry.providers) ? registry.providers : [];
+const existingIndex = registry.providers.findIndex((provider) => provider?.id === "custom-antigravity");
+const existingProvider = registry.providers[existingIndex];
+const validModelId = (id) => typeof id === 'string' && /^(?:gemini|claude)-[a-z0-9.-]{1,160}$/.test(id);
+const savedModels = existingProvider?.modelsCache?.models;
+let catalog = Array.isArray(savedModels) ? savedModels.filter(model => validModelId(model?.id)) : [];
+if (!catalog.length) catalog = modelIds.map(id => ({ id }));
+let fetchedAt = existingProvider?.modelsCache?.fetchedAt || stamp;
+
+if (process.argv.includes('--refresh-models')) {
+  try {
+    const result = await fetchModels();
+    if (!Array.isArray(result?.data) || !result.data.length || !result.data.every(model => validModelId(model?.id))) {
+      throw new Error('Invalid model catalog');
+    }
+    catalog = [...new Map(result.data.map(model => [model.id, model])).values()];
+    fetchedAt = new Date().toISOString();
+  } catch {
+    // Offline startup / OAuth not completed must not discard the last good list.
+    console.warn('Live Antigravity model discovery unavailable; keeping the saved model catalog.');
+  }
+}
+
+const models = catalog.map(({ id, description, name }) => ({
   id,
-  name: id,
+  name: typeof description === 'string' && description.trim() ? description.slice(0, 200)
+    : typeof name === 'string' && name.trim() ? name.slice(0, 200) : id,
   upstreamModelId: id,
   family: id.startsWith("claude-") ? "claude" : "gemini",
   brand: id.startsWith("claude-") ? "Claude" : "Gemini",
@@ -62,11 +90,39 @@ const antigravityProvider = {
   name: "Antigravity",
   enabled: true,
   authRef: "keyring:provider:custom-antigravity",
-  addedAt: stamp,
-  refreshedAt: stamp,
+  addedAt: existingProvider?.addedAt || stamp,
+  refreshedAt: fetchedAt,
   api: { npm: "@ai-sdk/anthropic", url: antigravityBaseUrl },
-  modelsCache: { fetchedAt: stamp, models },
+  modelsCache: { fetchedAt, models },
 };
+
+function fetchModels() {
+  return new Promise((resolve, reject) => {
+    // Always direct loopback HTTP: inherited HTTPS_PROXY must not intercept it.
+    const request = http.get(`${antigravityBaseUrl}/v1/models`, {
+      headers: { 'x-api-key': 'antigravity' }
+    }, response => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error('Model discovery failed'));
+        return;
+      }
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => {
+        body += chunk;
+        if (body.length > 1_000_000) request.destroy(new Error('Model catalog too large'));
+      });
+      response.on('error', reject);
+      response.on('end', () => {
+        try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
+      });
+    });
+    const timer = setTimeout(() => request.destroy(new Error('Model discovery timed out')), 10_000);
+    request.on('error', reject);
+    request.on('close', () => clearTimeout(timer));
+  });
+}
 
 function readJson(path, fallback) {
   try {
@@ -77,31 +133,17 @@ function readJson(path, fallback) {
 }
 
 function writeJson(path, value) {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-  chmodSync(path, 0o600);
-}
-
-function validProvider(provider) {
-  return provider?.id === "custom-antigravity"
-    && provider.templateId === "custom-anthropic"
-    && provider.enabled === true
-    && provider.authRef === "keyring:provider:custom-antigravity"
-    && provider.api?.url === antigravityBaseUrl
-    && provider.modelsCache?.models?.length === modelIds.length
-    && provider.modelsCache.models.every((model) => model.apiUrl === antigravityBaseUrl)
-    && modelIds.every((id) => provider.modelsCache.models.some((model) => model.id === id));
+  const temporary = `${path}.${process.pid}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(temporary, 0o600);
+  renameSync(temporary, path);
 }
 
 mkdirSync(relayHome, { recursive: true, mode: 0o700 });
 chmodSync(relayHome, 0o700);
 
-const providersPath = join(relayHome, "providers.json");
-const registry = readJson(providersPath, { schemaVersion: 1, providers: [] });
-registry.schemaVersion = 1;
-registry.providers = Array.isArray(registry.providers) ? registry.providers : [];
-const existingIndex = registry.providers.findIndex((provider) => provider?.id === "custom-antigravity");
 if (existingIndex === -1) registry.providers.push(antigravityProvider);
-else if (!validProvider(registry.providers[existingIndex])) registry.providers[existingIndex] = antigravityProvider;
+else registry.providers[existingIndex] = { ...existingProvider, ...antigravityProvider };
 writeJson(providersPath, registry);
 
 const secretsPath = join(relayHome, "secrets.json");

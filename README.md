@@ -142,7 +142,9 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/dantegolf/ClaudeGravity-
 
 ## Модели Relay AI
 
-ClaudeGravity регистрирует 22 model ID в локальном Relay AI registry:
+ClaudeGravity получает актуальный список моделей из Antigravity (`/v1/models`) при запуске и при **Restart** в WebUI, до запуска Relay AI. Поэтому модели, доступные вашему аккаунту в Antigravity, появляются и в каталоге для Claude Desktop — включая Gemini 3.8 Flash (Low, Medium, High, Tiered), когда API их возвращает.
+
+При недоступности API сохраняется последний успешно полученный каталог. Только при первой установке без сохранённого каталога используется стартовый список из 22 model ID:
 
 - Gemini 3.7 Flash: Low, Medium и High;
 - Gemini 3.6 Flash: Low, Medium, High и Tiered;
@@ -153,6 +155,8 @@ ClaudeGravity регистрирует 22 model ID в локальном Relay A
 - Claude Sonnet 4.6 и Claude Opus 4.6 Thinking.
 
 При первой настройке в избранное добавляются Gemini 3.7 Flash High, Gemini 3.1 Pro High, Gemini 2.5 Pro, Claude Sonnet 4.6 и Claude Opus 4.6 Thinking. Последующие пользовательские изменения избранного сохраняются.
+
+Если новая модель уже видна в WebUI, но ещё отсутствует в Claude Desktop, нажмите **Restart** в WebUI, дождитесь **READY** и заново откройте выбор модели в Claude Desktop. Если Desktop продолжает показывать старый каталог, полностью закройте и откройте его. После первого OAuth-входа также нажмите **Restart**, чтобы обновить каталог Relay.
 
 ## WebUI
 
