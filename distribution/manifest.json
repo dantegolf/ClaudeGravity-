@@ -32,16 +32,26 @@
     }
   },
   "network": {
-    "selectiveSmartDnsVersion": 1,
+    "selectiveSmartDnsVersion": 2,
     "defaultServers": [
       "111.88.96.50",
       "111.88.96.51"
     ],
     "hosts": [
       "cloudcode-pa.googleapis.com",
-      "daily-cloudcode-pa.googleapis.com",
-      "generativelanguage.googleapis.com",
-      "antigravity-unleash.goog"
+      "daily-cloudcode-pa.googleapis.com"
+    ],
+    "defaultDoh": "https://dns.dns-ai.ru/dns-query",
+    "fallbackServerGroups": [
+      [
+        "83.220.169.155",
+        "212.109.195.93",
+        "195.133.25.16"
+      ],
+      [
+        "45.155.204.190",
+        "37.230.192.51"
+      ]
     ]
   }
 }

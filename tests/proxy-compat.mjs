@@ -162,12 +162,14 @@ const thinking = await readFile(join(fixture, "src/format/thinking-utils.js"), "
 assert.match(thinking, /gemini-3\.7-flash-medium'\) \? 4000/);
 
 const helpers = await readFile(join(fixture, "src/utils/helpers.js"), "utf8");
-assert.match(helpers, /ClaudeGravity selective Smart DNS v1/);
+assert.match(helpers, /ClaudeGravity selective Smart DNS v2/);
 assert.match(helpers, /cloudcode-pa\.googleapis\.com/);
 assert.match(helpers, /daily-cloudcode-pa\.googleapis\.com/);
 assert.match(helpers, /CLAUDEGRAVITY_SMART_DNS_SERVERS/);
-assert.match(helpers, /111\.88\.96\.50,111\.88\.96\.51/);
-assert.match(helpers, /undiciFetch\(url, \{ \.\.\.options, dispatcher \}\)/);
+assert.match(helpers, /111\.88\.96\.50/);
+assert.match(helpers, /dns\.dns-ai\.ru/);
+assert.match(helpers, /EnvHttpProxyAgent/);
+assert.match(helpers, /return claudeGravityFetch\(url, options\)/);
 assert.match(helpers, /systemLookup\(hostname, options, callback\)/);
 
 const webUi = await readFile(join(fixture, "public/index.html"), "utf8");
@@ -189,6 +191,37 @@ assert.equal(second.status, 0, second.stderr);
 assert.match(second.stdout, /already applied/);
 assert.match(second.stdout, /selective Smart DNS routing is already applied/);
 assert.match(second.stdout, /WebUI branding is already applied/);
+assert.equal(await readFile(join(fixture, "src/utils/helpers.js"), "utf8"), helpers);
+
+// Upgrade the v1 layout in place, preserving surrounding upstream functions.
+const legacyRuntime = `
+import { Agent, fetch as undiciFetch } from 'undici';
+import { Resolver, lookup as systemLookup } from 'node:dns';
+// ClaudeGravity selective Smart DNS v1
+const legacyHosts = ['generativelanguage.googleapis.com', 'antigravity-unleash.goog'];
+function claudeGravitySmartDnsDispatcher(url, options) {
+    return null;
+}
+`;
+const legacyHelpers = helpersSource.replace("import { config } from '../config.js';",
+  "import { config } from '../config.js';" + legacyRuntime).replace('    return fetch(url, options);',
+  `    const dispatcher = claudeGravitySmartDnsDispatcher(url, options);
+    return dispatcher
+        ? undiciFetch(url, { ...options, dispatcher })
+        : fetch(url, options);`);
+await writeFile(join(fixture, 'src/utils/helpers.js'), legacyHelpers);
+assert.equal(runPatch().status, 0);
+const migrated = await readFile(join(fixture, 'src/utils/helpers.js'), 'utf8');
+assert.match(migrated, /ClaudeGravity selective Smart DNS v2/);
+assert.doesNotMatch(migrated, /legacyHosts|claudeGravitySmartDnsDispatcher|Smart DNS v1/);
+assert.match(migrated, /export function sleep/);
+assert.equal(runPatch().status, 0);
+assert.equal(await readFile(join(fixture, 'src/utils/helpers.js'), 'utf8'), migrated);
+
+const incompatible = legacyHelpers.replace('function claudeGravitySmartDnsDispatcher', 'function unknownDispatcher');
+await writeFile(join(fixture, 'src/utils/helpers.js'), incompatible);
+assert.notEqual(runPatch().status, 0);
+assert.equal(await readFile(join(fixture, 'src/utils/helpers.js'), 'utf8'), incompatible);
 
 const nativeFixture = await mkdtemp(join(tmpdir(), "claudegravity-proxy-native-"));
 const nativeSources = {
@@ -214,7 +247,7 @@ assert.match(nativeRun.stdout, /already supports the Antigravity 2\.8 protocol/)
 assert.match(nativeRun.stdout, /Applied ClaudeGravity selective Smart DNS routing/);
 assert.match(nativeRun.stdout, /Applied ClaudeGravity WebUI branding/);
 const nativeHelpers = await readFile(join(nativeFixture, "src/utils/helpers.js"), "utf8");
-assert.match(nativeHelpers, /ClaudeGravity selective Smart DNS v1/);
+assert.match(nativeHelpers, /ClaudeGravity selective Smart DNS v2/);
 const nativeWebUi = await readFile(join(nativeFixture, "public/index.html"), "utf8");
 assert.match(nativeWebUi, /ClaudeGravity WebUI v1/);
 

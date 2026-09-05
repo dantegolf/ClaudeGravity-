@@ -81,8 +81,8 @@ for (const required of ['ClaudeGravity WebUI v1', 'LOCAL AI GATEWAY', 'CLAUDEGRA
 
 const builder = await read('distribution/build-runtime.mjs');
 if (!builder.includes("'--omit=optional'")) throw new Error('Runtime build must omit architecture-specific optional dependencies');
-if (!builder.includes('ClaudeGravity selective Smart DNS v1')) throw new Error('Runtime build does not verify Smart DNS');
-for (const required of ['scripts/supervisor.mjs', 'scripts/configure-claude-desktop.mjs']) {
+if (!builder.includes('ClaudeGravity selective Smart DNS v2')) throw new Error('Runtime build does not verify Smart DNS');
+for (const required of ['scripts/supervisor.mjs', 'scripts/configure-claude-desktop.mjs', 'scripts/smart-dns.mjs']) {
   if (!builder.includes(required)) throw new Error(`Runtime build does not bundle ${required}`);
 }
 
@@ -97,7 +97,9 @@ if (builtRoot) {
     throw new Error('Built lockfile does not resolve the pinned proxy commit');
   }
   const helpers = await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/src/utils/helpers.js'), 'utf8');
-  if (!helpers.includes('ClaudeGravity selective Smart DNS v1')) throw new Error('Built runtime is missing Smart DNS patch');
+  if (!helpers.includes('ClaudeGravity selective Smart DNS v2')) throw new Error('Built runtime is missing Smart DNS patch');
+  const networkSource = await read('launchers/scripts/smart-dns.mjs');
+  if (!helpers.includes(networkSource)) throw new Error('Built runtime contains an outdated network implementation');
   const brandedUi = await readFile(join(builtRoot, 'runtime/node_modules/antigravity-claude-proxy/public/index.html'), 'utf8');
   if (!brandedUi.includes('ClaudeGravity WebUI v1')) throw new Error('Built runtime is missing the ClaudeGravity WebUI branding patch');
   if (!brandedUi.includes('<title>ClaudeGravity</title>')) throw new Error('Built runtime still exposes the Antigravity Console title');
@@ -111,10 +113,12 @@ if (builtRoot) {
     'scripts/supervisor.mjs',
     'scripts/configure-claude-desktop.mjs',
     'scripts/configure-relay.mjs',
+    'scripts/smart-dns.mjs',
   ]) {
     await readFile(join(builtRoot, required));
   }
   const buildInfo = JSON.parse(await readFile(join(builtRoot, 'BUILD_INFO.json'), 'utf8'));
+  if (JSON.stringify(buildInfo.smartDns) !== JSON.stringify(manifest.network)) throw new Error('Built network configuration differs from manifest');
   if (buildInfo.gateway?.publicBaseUrl !== 'http://127.0.0.1:17645/anthropic') throw new Error('Built runtime does not declare the unified public gateway');
   if (buildInfo.gateway?.antigravityInternalBaseUrl !== 'http://127.0.0.1:18080') throw new Error('Built runtime does not declare the internal engine endpoint');
 }

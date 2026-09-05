@@ -94,7 +94,7 @@ if (webUiStore.includes(unsafeTranslationLookup)) {
 }
 
 const helpers = await readFile(join(proxyRoot, 'src', 'utils', 'helpers.js'), 'utf8');
-if (!helpers.includes('ClaudeGravity selective Smart DNS v1')) {
+if (!helpers.includes('ClaudeGravity selective Smart DNS v2')) {
   throw new Error('Bundled proxy is missing the ClaudeGravity selective Smart DNS patch.');
 }
 webUi = await readFile(webUiPath, 'utf8');
@@ -132,6 +132,7 @@ const copies = [
   ['launchers/scripts/configure-claude-desktop.mjs', 'scripts/configure-claude-desktop.mjs'],
   ['launchers/scripts/supervisor.mjs', 'scripts/supervisor.mjs'],
   ['launchers/scripts/patch-antigravity-proxy.mjs', 'scripts/patch-antigravity-proxy.mjs'],
+  ['launchers/scripts/smart-dns.mjs', 'scripts/smart-dns.mjs'],
   ['distribution/manifest.json', 'manifest.json'],
   ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md']
 ];
